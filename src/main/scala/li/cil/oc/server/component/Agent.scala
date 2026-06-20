@@ -325,6 +325,9 @@ trait Agent extends traits.LevelControl with traits.ContainerControl with traits
         }
       }
     }
+    if (captured != null) {
+      captured.clear()
+    }
   }
 
   // ----------------------------------------------------------------------- //
