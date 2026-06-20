@@ -82,6 +82,8 @@ class Cable(props: Properties) extends SimpleBlock(props) with IForgeBlock {
       case _ => state
     }
     if (newState != state) world.setBlock(pos, newState, 0x13)
+    else world.sendBlockUpdated(pos, state, state, 3)
+    super.neighborChanged(state, world, pos, other, otherPos, moved)
   }
 
   override def updateShape(state: BlockState, fromSide: Direction, fromState: BlockState, world: IWorld, pos: BlockPos, fromPos: BlockPos): BlockState =
