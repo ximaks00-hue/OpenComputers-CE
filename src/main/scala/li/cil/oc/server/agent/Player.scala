@@ -189,11 +189,15 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentL
 
   // ----------------------------------------------------------------------- //
 
+  private def entitiesOfClass[Type <: Entity](clazz: Class[Type], bounds: net.minecraft.world.phys.AABB): util.List[Type] = {
+    Option(level.getEntitiesOfClass(clazz, bounds)).getOrElse(util.Collections.emptyList())
+  }
+
   def closestEntity[Type <: Entity](clazz: Class[Type], side: Direction = facing): Option[Entity] = {
     val bounds = BlockPosition(agent).offset(side).bounds
-    val candidates = level.getEntitiesOfClass(clazz, bounds, null)
-    if (candidates.isEmpty) return None
-    Some(candidates.asScala.minBy(e => distanceToSqr(e)))
+    val candidates = entitiesOfClass(clazz, bounds)
+    if (candidates.isEmpty) None
+    else Some(candidates.asScala.minBy(e => distanceToSqr(e)))
   }
 
   def entitiesOnSide[Type <: Entity](clazz: Class[Type], side: Direction): util.List[Type] = {
@@ -201,11 +205,11 @@ class Player(val agent: internal.Agent) extends FakePlayer(agent.getEnvironmentL
   }
 
   def entitiesInBlock[Type <: Entity](clazz: Class[Type], blockPos: BlockPosition): util.List[Type] = {
-    level.getEntitiesOfClass(clazz, blockPos.bounds, null)
+    entitiesOfClass(clazz, blockPos.bounds)
   }
 
   private def adjacentItems: util.List[ItemEntity] = {
-    level.getEntitiesOfClass(classOf[ItemEntity], BlockPosition(agent).bounds.inflate(2, 2, 2), null)
+    entitiesOfClass(classOf[ItemEntity], BlockPosition(agent).bounds.inflate(2, 2, 2))
   }
 
   private def collectDroppedItems(itemsBefore: Iterable[ItemEntity]): Unit = {
