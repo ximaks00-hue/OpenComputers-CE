@@ -55,6 +55,13 @@ CE base: `dev-MC1.20`
 | BUG-059 | server/network | `Packet.size` null/none = 4 bytes (was 1) | `Network.scala:709` |
 | BUG-060 | transposer traits | `areStacksEquivalent` uses all item tags, not ore tags | `LevelInventoryAnalytics.scala:70-73` |
 | BUG-061 | TerminalServer | Buffer max tier `Tier.Four` (190×60, 16-bit) vs Original `Tier.Three` (160×50, 8-bit) | `TerminalServer.scala:45-47` |
+| BUG-062 | Relay CC | `modem_message` multi-arg payload nested as one element | `Relay.scala:127` — CE regression |
+| BUG-063 | Relay CC | Empty payload after `answerPort` → `payload(0)` IndexOutOfBounds | `Relay.scala:127` — CE regression |
+| BUG-064 | UpgradeChunkloader | Custom dimensions → `throw new Error("deprecated")` in `isDimensionAllowed` | `UpgradeChunkloader.scala:127-131` — CE regression |
+| BUG-065 | DebugCard | `setBlocks` block id from arg 3 not 6 | `DebugCard.scala:890` — CE regression |
+| BUG-066 | Geolyzer / Solar / DebugCard | `canSeeSkyFromBelowWater` used instead of `canSeeSky` / `canBlockSeeSky` | `Geolyzer.scala:85`, `UpgradeSolarGenerator.scala:61`, `DebugCard.scala:866` — CE regression |
+| BUG-067 | DebugCard | `getDimensionId` throws on modded dimensions | `DebugCard.scala:681-685` — CE regression |
+| BUG-069 | Server (rack) | Missing `hasCapability` on mountable Server | `Server.scala:242-251` — CE regression |
 
 ---
 
@@ -102,9 +109,12 @@ CE base: `dev-MC1.20`
 | server/component/Agent | Phase 5 audited (BUG-017 on dev) |
 | common/component/TerminalServer | Phase 5 audited (BUG-061) |
 | server/machine/luaj, luac | Phase 5 OK (worldTime via BUG-034) |
-| client/PacketHandler | Phase 5 partial (server-side gaps inherited) |
+| client/PacketHandler | Phase 8 audited — opcode symmetry OK |
 | common/entity/Drone | Parity OK |
 | server/machine/ArgumentsImpl | Parity OK |
+| common/blockentity/Case, Capacitor, PowerDistributor | Phase 8 parity OK |
+| server/component/Server (rack) | Phase 8 audited (BUG-069) |
+| server/component/DebugCard | Phase 8 audited (BUG-065, BUG-067; BUG-066 sky API) |
 
 ---
 
@@ -184,6 +194,185 @@ Note: BUG-050/051 overlap Phase 2 BUG-045/046 with line-level proof in EventHand
 | `luaj/OSAPI.scala`, `luac/OSAPI.scala` | Both read `machine.worldTime` — fixed by BUG-034 in PR #5 |
 | `Terminal.scala` | Client-side range check + GUI; port of 1.12 `GuiType.Terminal` flow |
 | `onRobotStateRequest` | No distance check — **inherited** in Original |
+
+---
+
+## Phase 6 — new CONFIRMED findings (2026-06-20)
+
+| ID | Sev | Module | Issue | Evidence |
+|----|-----|--------|-------|----------|
+| BUG-062 | HIGH | Relay + CC | `RelayCCAdapter.queueMessage` nests multi-arg payload | Original flattens: `Array(Seq(header) ++ args: _*)`. CE: `header :+ payload` when `length > 1` → CC `modem_message` gets 4 args with last arg a table/seq. Breaks multi-part OC→CC relay messages. |
+| BUG-063 | MED | Relay + CC | Empty `args` after answerPort strip | `if (payload.length > 1) payload else payload(0)` throws when `payload.isEmpty`. Original: event is `[name, port, answerPort]` only. |
+| BUG-064 | HIGH | UpgradeChunkloader | Modded/custom dimensions crash whitelist check | CE maps only OVERWORLD/NETHER/END; `case _ => throw new Error("deprecated")`. Original: `world.provider.getDimension` for any dim. |
+
+### Phase 6 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `Relay.scala` (core) | Wireless/linked relay, strength, repeater, `tryEnqueuePacket` — same as Original except BUG-062/063 |
+| `RelayPeripheral.scala` | CC transmit/open/close — same packet shape as Original |
+| `Microcontroller.scala` | Hub/snooper routing, energy pump, plug connect — equivalent (see INHERITED `outputSides` load) |
+| `Rack.scala` | Node mapping, relay, mountable power, redstone fan-out — equivalent |
+| `Keyboard.scala` (block TE) | Sided node, NBT — equivalent |
+| `ControllerImpl.scala` (nanomachines) | Command range, wireless commands — equivalent |
+| `NetSplitter.scala` | Invert + network reconnect on redstone — equivalent |
+| `ChunkloaderUpgradeHandler.scala` | Ticket restore 3×3 shape — equivalent (Forge API port) |
+| `FileSystem` component | Same managed-environment logic as Original |
+| `InternetCard` | `checkAddress` / network callbacks — equivalent |
+
+### Phase 6 — INHERITED (both ports)
+
+| Issue | File |
+|-------|------|
+| `outputSides` saved to NBT but load discards `getBooleanArray` | `Microcontroller.scala:217` |
+| Network packet dest load inverted on reload | `Network.scala:567-569` (BUG-058) |
+
+---
+
+## Phase 7 — new CONFIRMED findings (2026-06-20)
+
+| ID | Sev | Module | Issue | Evidence |
+|----|-----|--------|-------|----------|
+| BUG-066 | HIGH | Geolyzer, UpgradeSolarGenerator, DebugCard | Wrong sky visibility API | Original: `world.canBlockSeeSky(pos)`. CE: `level.canSeeSkyFromBelowWater(pos)` — different semantics (underwater-skylight vs direct sky). Breaks `geolyzer.canSeeSky()`, `isSunVisible()`, solar panel generation, debug card sky query. Fix: `level.canSeeSky(pos)`. |
+
+### Phase 7 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `DiskDrive.scala` | eject/media/isEmpty, floppy NBT sync — equivalent |
+| `Assembler.scala` | template validate, energy assembly tick — equivalent |
+| `Disassembler.scala` | queue, energy buffer, recipe disassembly — equivalent |
+| `Printer.scala` | 3D print commit/cost/output merge — equivalent |
+| `Raid.scala` | 3×HDD merge FS, wipe, label — equivalent |
+| `Waypoint.scala` | label, Waypoints registry, particles — equivalent |
+| `Charger.scala` | robot/drone/player charge, redstone speed — equivalent (equipment scan uses full `inventory.items` vs Original `mainInventory` only — minor scope change) |
+| `Hologram.scala` | voxel volume, fill/setRaw, energy, SaveHandler — equivalent |
+| `HologramRenderer.scala` | distance fade alpha **applied** via `setShaderColor` — unlike ScreenRenderer BUG-043 |
+| `UpgradeDatabase.scala` | hash/index/copy/clone — equivalent |
+| `Geolyzer.scala` (scan/analyze/store) | scan volume, event bus, store via `Block.getDrops` — 1.20 API port (intentional) |
+| `EventHandlerVanilla` (geolyzer) | scan/analyze handlers — equivalent port |
+
+### Phase 7 — INHERITED (both ports)
+
+| Issue | File |
+|-------|------|
+| Hologram `getRenderBoundingBox` max-Z uses `translation.x` instead of `translation.z` | `Hologram.scala:457` (both ports) |
+
+---
+
+## Phase 8 — block infrastructure & DebugCard (2026-06-20)
+
+**Scope:** `Case`, `Capacitor`, `PowerDistributor`, rack `Server`, `MotionSensor`, `PowerBalancer`, `Adapter`, `UpgradeDatabase`, `PacketHandler` client/server opcode map, `RobotMove` packet wire format, `DebugCard.WorldValue` callbacks.
+
+**Method:** Line-by-line diff CE `dev-MC1.20` vs Etalon Original 1.12.2. No in-game verification in this phase — confidence tag **CONFIRMED** only where source proof is unambiguous.
+
+---
+
+### BUG-065 (HIGH) — DebugCard `setBlocks` wrong argument index
+
+| | |
+|---|---|
+| **File** | `server/component/DebugCard.scala` — `WorldValue.setBlocks` |
+| **CE (broken)** | Line 890: `args.checkString(3)` — reads **xMax** (corner coordinate) as block id |
+| **Original (correct)** | Line 800: `args.checkString(6)` — block id is the **7th** argument (0-based index 6) |
+| **Signature** | `function(x1,y1,z1, x2,y2,z2, id:string, meta:number)` |
+
+**Why this is wrong:** Arguments 0–2 are `(xMin,yMin,zMin)`, 3–5 are `(xMax,yMax,zMax)`. The block resource id must come from index **6**. Using index 3 passes an integer coordinate to `ResourceLocation.tryParse`, which yields `null` or a nonsense block — area fill never places the intended block.
+
+**Impact:** Debug-card `setBlocks` is completely broken on CE. Single-block `setBlock` (index 3 for id) is **unaffected** — only the area variant regressed during 1.20 port.
+
+**Recommended fix:** One-line change: `args.checkString(6)` (and keep `args.checkInteger(7)` for meta).
+
+**Suggested PR:** `fix/bug-065-debugcard-setblocks`
+
+---
+
+### BUG-067 (HIGH) — DebugCard `getDimensionId` crashes on modded dimensions
+
+| | |
+|---|---|
+| **File** | `server/component/DebugCard.scala` — `WorldValue.getDimensionId` |
+| **CE (broken)** | Lines 681–685: match only `OVERWORLD`/`NETHER`/`END`; `case _ => throw new Error("deprecated")` |
+| **Original (correct)** | Line 624: `result(world.provider.getDimension)` — numeric id for **any** dimension |
+
+**Why this is wrong:** During MC 1.20 port, vanilla dimension ids were hard-coded (0, -1, 1) as a stopgap. Modded dimensions (Twilight Forest, Aether, custom datapack dims, etc.) hit the default case and **crash the Lua callback** with an uncaught `Error`, not a clean Lua error.
+
+**Same root cause class as BUG-064** (UpgradeChunkloader whitelist). Both need a 1.20-safe numeric dimension key — e.g. registry hash, Forge dimension id mapping, or documented breaking change to `getDimension()` string API (which CE already exposes correctly at line 697).
+
+**Impact:** Any debug-card script calling `getDimensionId()` in a modded dimension terminates the computer.
+
+**Recommended fix:** Return a stable int per dimension (parity with 1.12 behaviour) or deprecate numeric id and document migration to `getDimension()` string — but **do not throw** on unknown dims.
+
+**Suggested PR:** `fix/bug-064-067-dimension-api` (batch with chunkloader)
+
+---
+
+### BUG-069 (MED) — Rack `Server` missing `hasCapability`
+
+| | |
+|---|---|
+| **File** | `server/component/Server.scala` — `ICapabilityProvider` |
+| **CE** | Lines 242–251: only `getCapability`; iterates components, returns first present `LazyOptional` |
+| **Original** | Lines 237–244: **`hasCapability`** probes components; **`getCapability`** only after `hasCapability` check |
+
+**Why this matters:** Forge/NeoForge mods often call `hasCapability(cap, side)` before `getCapability`. Without override, `Server` inherits default `false` from the capability helper chain even when an installed component (e.g. energy, fluid, item handler from another mod's card) would answer `true`.
+
+**Impact:** Rack-mounted servers may be invisible to WAILA/JADE probes, cable mods, or automation that checks capabilities on the mountable — even though direct `getCapability` on CE might still work.
+
+**Recommended fix:** Add `hasCapability` mirroring Original's `components.exists { case Some(c: ICapabilityProvider) => c.getCapability(...).isPresent }` pattern (1.20: use `LazyOptional.isPresent`).
+
+**Related:** BUG-047/048 on blockentity `ComponentInventory` — same class of capability probe ordering issue.
+
+**Suggested PR:** `fix/bug-069-server-hasCapability`
+
+---
+
+### Phase 8 — reviewed, parity OK
+
+| Module | What was verified | Notes |
+|--------|-------------------|-------|
+| `Case.scala` | Tier load/save, creative infinite power, inventory slots, connector sides | CE adds tier-4 case + creative `Tier.Five` — **intentional extension**, not a bug |
+| `Capacitor.scala` | Connector nodes, energy buffer, sided connectivity | Equivalent |
+| `PowerDistributor.scala` | Six connector nodes, `PowerBalancer` tick, NBT | Equivalent |
+| `Server.scala` (core) | Machine lifecycle, rack mount, analyze, power | Equivalent except BUG-069 |
+| `MotionSensor.scala` | Entity scan ray algorithm | 1.20 API port, logic same |
+| `PowerBalancer.scala` | Multi-connector synchronized buffer distribution | Equivalent (nested locks preserved) |
+| `Adapter.scala` | Side open, block driver scan, neighbor notify | Equivalent |
+| `UpgradeDatabase.scala` | hash/index/copy/clone callbacks | Equivalent |
+| `RobotMove` packet | Server `writeUTF(dimension)` + coords; client `onRobotMove` read order | Correct 1.20 port of int dimension id |
+| `PacketHandler` | All `PacketType` enum values have client receive + server receive handlers | Opcode symmetry verified |
+
+---
+
+### Phase 8 — audit notes (not new functional bugs)
+
+| Note | Detail |
+|------|--------|
+| **BUG-037 not merged to `dev-MC1.20`** | `RedstoneAware.getObjectFuzzy` (lines 40–51) contains dead duplicate branches. Fix exists on `fix/p0-parity-audit-batch1` only. Functional int + double key paths remain — low runtime risk. |
+| **BUG-038 load path** | `Computer.loadForServer` sets `robot.setLevel` only; `worldPosition` updated in `RobotProxy.clearRemoved`. Usually OK on chunk load (Robot recreated at saved pos); edge case for moved robots without proxy recreate — fix on batch1 branch. |
+| **BUG-039** | `onRedstoneOutputEnabledChanged`: CE `updateNeighborsAt` vs Original `notifyNeighborsOfStateChange(..., true)` — may differ for observers; tracked separately. |
+| **Creative tier renumbering** | Original creative case = `Tier.Four`; CE = `Tier.Five` with new regular tier-4 case. Documented as intentional in `ItemUtils` / `Case.isCreative`. |
+
+---
+
+### Phase 8 — recommended fix priority (code audit)
+
+1. **BUG-066** — sky API (3 files, one-line each) — highest player-visible impact  
+2. **BUG-065** — DebugCard `setBlocks` (one line)  
+3. **BUG-062/063** — Relay CC `queueMessage` flatten (one line)  
+4. **BUG-064 + BUG-067** — dimension API batch  
+5. **BUG-069** — Server `hasCapability`  
+6. Remaining open registry items (Network, integration, Agent, Robot GUI, …)
+
+---
+
+### Phase 9 — pending audit scope
+
+- Integration disabled code paths: AE2, IC2, TIS3D (`Mods.scala`, commented drivers)  
+- `ContainerLevelControl` / `LevelInventoryAnalytics` deep pass  
+- Client GUI: `Robot.scala` ComponentTracker (BUG-042)  
+- `EventHandler` chunk unload double teardown (BUG-056)  
+- Merge status: `fix/p0-parity-audit-batch1` vs `dev-MC1.20`
 
 ---
 

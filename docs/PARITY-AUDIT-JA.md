@@ -370,6 +370,124 @@ CE: import コメントアウト、NBT 保存のみ。**読取は可、外部ケ
 
 ---
 
+## K. Phase 6 — 新規 CONFIRMED（2026-06-20）
+
+| ID | 重要度 | モジュール | 問題 |
+|----|--------|------------|------|
+| BUG-062 | HIGH | Relay + CC | `modem_message` の複数 payload が 1 要素にネスト（Original は flatten） |
+| BUG-063 | MED | Relay + CC | payload 空で `payload(0)` → IndexOutOfBounds |
+| BUG-064 | HIGH | UpgradeChunkloader | カスタム次元で `throw new Error("deprecated")`（Original は任意 dimension ID） |
+| BUG-066 | HIGH | Geolyzer / Solar / DebugCard | `canSeeSkyFromBelowWater` を使用（Original は `canBlockSeeSky`）— 天空判定が誤る |
+
+---
+
+## L. Phase 7 — 新規 CONFIRMED（2026-06-20）
+
+| ID | 重要度 | モジュール | 問題 |
+|----|--------|------------|------|
+| BUG-066 | HIGH | Geolyzer / Solar / DebugCard | `canSeeSkyFromBelowWater` を使用（Original は `canBlockSeeSky`） |
+
+### BUG-066 — 天空 visibility API の誤り
+
+**ファイル:** `Geolyzer.scala:85`, `UpgradeSolarGenerator.scala:61`, `DebugCard.scala:866`
+
+| | |
+|---|---|
+| **Original** | `world.canBlockSeeSky(pos)` — ブロック位置から直接天空が見えるか |
+| **CE** | `level.canSeeSkyFromBelowWater(pos)` — **水中から上方の光**を判定する別 API |
+
+**なぜ誤りか:** 1.20 ポート時にメソッド名の類似で誤選択。水中・半透明ブロック下での挙動が Original と異なる。
+
+**影響:** `geolyzer` の天空判定、ソーラー発電、`debug.card` の `canSeeSky` が誤った結果を返す。
+
+**推奨修正:** `level.canSeeSky(pos)` に統一（3 ファイル各 1 行）。
+
+**parity OK:** DiskDrive, Assembler, Disassembler, Printer, Raid, Waypoint, Charger, Hologram (+ HologramRenderer は fade 適用済み), UpgradeDatabase, Geolyzer scan/store
+
+---
+
+## M. Phase 8 — ブロック基盤 & DebugCard（2026-06-20）
+
+**監査範囲:** Case, Capacitor, PowerDistributor, rack Server, MotionSensor, PowerBalancer, Adapter, UpgradeDatabase, PacketHandler opcode 対称, RobotMove パケット, DebugCard.WorldValue
+
+**方法:** CE `dev-MC1.20` と Etalon Original 1.12.2 のソース diff。in-game 検証なし — **CONFIRMED** はソース上確実なもののみ。
+
+---
+
+### BUG-065 (HIGH) — DebugCard `setBlocks` 引数インデックス誤り
+
+**ファイル:** `server/component/DebugCard.scala` — `WorldValue.setBlocks`
+
+| | |
+|---|---|
+| **CE（誤）** | 890 行: `args.checkString(3)` — **xMax**（座標）を block id として読む |
+| **Original（正）** | 800 行: `args.checkString(6)` — 7 番目の引数が block id |
+| **シグネチャ** | `function(x1,y1,z1, x2,y2,z2, id:string, meta:number)` |
+
+**なぜ誤りか:** 引数 0–5 は両コーナー座標。block id は index **6**。index 3 は整数座標のため `ResourceLocation.tryParse` が失敗または無意味なブロックになる。
+
+**影響:** エリア一括 `setBlocks` が CE で完全に動作しない。単一 `setBlock`（index 3 = id）は **影響なし**。
+
+**推奨修正:** `args.checkString(6)` に 1 行変更。
+
+---
+
+### BUG-067 (HIGH) — DebugCard `getDimensionId` が modded 次元でクラッシュ
+
+**ファイル:** `DebugCard.scala` — `WorldValue.getDimensionId`（681–685 行）
+
+| | |
+|---|---|
+| **CE** | OVERWORLD/NETHER/END のみ; `case _ => throw new Error("deprecated")` |
+| **Original** | `world.provider.getDimension` — 任意次元の数値 ID |
+
+**なぜ誤りか:** 1.20 ポート時の暫定 hard-code。modded 次元で Lua コールバックが未捕捉 `Error` でコンピュータ停止。
+
+**BUG-064（Chunkloader）と同根。** 1.20 向け安定 int キーが必要。
+
+**推奨修正:** 数値 ID を返すか、`getDimension()` 文字列 API への移行を文書化 — **未知次元で throw しない**。
+
+---
+
+### BUG-069 (MED) — rack `Server` に `hasCapability` なし
+
+**ファイル:** `server/component/Server.scala`（242–251 行）
+
+| | |
+|---|---|
+| **CE** | `getCapability` のみ |
+| **Original** | `hasCapability` + `getCapability`（237–244 行） |
+
+**なぜ問題か:** 多くの mod は `hasCapability` を先に呼ぶ。未 override だと mountable Server が false を返し、コンポーネント capability があっても検出されない。
+
+**関連:** BUG-047/048（blockentity ComponentInventory）と同種。
+
+**推奨修正:** Original と同様の `hasCapability` override を追加。
+
+---
+
+### Phase 8 — parity OK
+
+Case（tier-4 + creative Tier.Five は意図的拡張）, Capacitor, PowerDistributor, Server コア, MotionSensor, PowerBalancer, Adapter, UpgradeDatabase, RobotMove パケット, PacketHandler opcode 対称
+
+### Phase 8 — 監査メモ
+
+- **BUG-037** は `dev-MC1.20` 未マージ（`getObjectFuzzy` dead code）
+- **BUG-038** Robot `worldPosition` — `clearRemoved` で通常は OK; batch1 分支に fix
+- **BUG-039** redstone output-enable neighbor 通知差
+
+### Phase 8 — 推奨 fix 優先度
+
+1. BUG-066（天空 API）→ 2. BUG-065 → 3. BUG-062/063 → 4. BUG-064/067 → 5. BUG-069
+
+### Phase 9 予定
+
+AE2/IC2/TIS3D 無効コード, ContainerLevelControl, Robot GUI BUG-042, EventHandler BUG-056, batch1 マージ状況
+
+**INHERITED:** Microcontroller `outputSides` NBT 未復元; Hologram bounding box max-Z typo
+
+---
+
 ## F. PR 一覧（fork: ximaks00-hue）
 
 | PR | ブランチ | 内容 | 状態 |
@@ -385,9 +503,9 @@ CE: import コメントアウト、NBT 保存のみ。**読取は可、外部ケ
 
 ## G. 検証状況
 
-- **コード監査:** Phase 1–5 完了
-- **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3/4 項目は **未検証**
-- **推奨 fix 優先:** BUG-058 → BUG-049/057/054 → BUG-052 → BUG-059 → BUG-043
+- **コード監査:** Phase 1–8 完了（Phase 8: Case/Capacitor/PowerDistributor/Server/Adapter/PacketHandler/DebugCard）
+- **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3–8 項目は **未検証**
+- **推奨 fix 優先:** BUG-066 → BUG-065 → BUG-062/063 → BUG-064/067 → BUG-069 → BUG-058 → BUG-049/057/054
 - **推奨テスト順:** os.time → compare → redstone map → robot reload → InputBuffer → 既存 PR 群
 
 ---
