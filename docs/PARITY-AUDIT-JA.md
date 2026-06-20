@@ -482,9 +482,26 @@ Case（tier-4 + creative Tier.Five は意図的拡張）, Capacitor, PowerDistri
 
 ### Phase 9 予定
 
-AE2/IC2/TIS3D 無効コード, ContainerLevelControl, Robot GUI BUG-042, EventHandler BUG-056, batch1 マージ状況
+Phase 10: LinkedCard, Switch block TE, Keyboard disconnect, dev FS fromResource
 
 **INHERITED:** Microcontroller `outputSides` NBT 未復元; Hologram bounding box max-Z typo
+
+---
+
+## N. Phase 9 — transposer/integration/EventHandler/GUI（2026-06-20）
+
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-070 | HIGH | `compare()` が fuzzy 引数を無視（`optBoolean(1)` が TODO のまま）— dev に BUG-008 修正未マージ |
+| BUG-020 | MED | FlatScreen が back-face cull をスキップ（`ScreenRenderer.scala:174`） |
+| BUG-056 | MED | chunk unload で `dispose()` + `scheduleClose()` 二重 — CE は block entity 走査が追加 |
+| BUG-042 | MED | Robot GUI が ComponentTracker 一度きり参照（Original は components 直参照） |
+
+**integration（BUG-003/004 再確認）:** AE2/TIS3D は `Mods.Proxies` コメントアウト + **ソースパッケージ欠落**。JEI は全ファイルコメントアウト。IC2/AE2 power trait 無効。
+
+**fix 分支が dev 未マージ:** BUG-008/070, BUG-027 (`LevelAware.scala:87` null predicate), BUG-035 (`getV1elocity`), BUG-037, BUG-038
+
+**parity OK:** ContainerLevelControl drop/suck, Hub trait, LevelAware 2-arg entity lookup
 
 ---
 
@@ -503,7 +520,7 @@ AE2/IC2/TIS3D 無効コード, ContainerLevelControl, Robot GUI BUG-042, EventHa
 
 ## G. 検証状況
 
-- **コード監査:** Phase 1–8 完了（Phase 8: Case/Capacitor/PowerDistributor/Server/Adapter/PacketHandler/DebugCard）
+- **コード監査:** Phase 1–9 完了（Phase 9: ContainerLevelControl, integration, EventHandler, Robot GUI）
 - **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3–8 項目は **未検証**
 - **推奨 fix 優先:** BUG-066 → BUG-065 → BUG-062/063 → BUG-064/067 → BUG-069 → BUG-058 → BUG-049/057/054
 - **推奨テスト順:** os.time → compare → redstone map → robot reload → InputBuffer → 既存 PR 群

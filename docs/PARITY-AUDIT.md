@@ -62,6 +62,8 @@ CE base: `dev-MC1.20`
 | BUG-066 | Geolyzer / Solar / DebugCard | `canSeeSkyFromBelowWater` used instead of `canSeeSky` / `canBlockSeeSky` | `Geolyzer.scala:85`, `UpgradeSolarGenerator.scala:61`, `DebugCard.scala:866` — CE regression |
 | BUG-067 | DebugCard | `getDimensionId` throws on modded dimensions | `DebugCard.scala:681-685` — CE regression |
 | BUG-069 | Server (rack) | Missing `hasCapability` on mountable Server | `Server.scala:242-251` — CE regression |
+| BUG-070 | Transposer/Robot | `compare()` ignores fuzzy flag — `optBoolean(1)` dead code | `ContainerLevelControl.scala:31-32` — CE regression (fix on batch1, not on dev) |
+| BUG-020 | Client | FlatScreen skips back-face cull — text visible from behind | `ScreenRenderer.scala:174` — CE regression |
 
 ---
 
@@ -115,6 +117,10 @@ CE base: `dev-MC1.20`
 | common/blockentity/Case, Capacitor, PowerDistributor | Phase 8 parity OK |
 | server/component/Server (rack) | Phase 8 audited (BUG-069) |
 | server/component/DebugCard | Phase 8 audited (BUG-065, BUG-067; BUG-066 sky API) |
+| server/component/traits/ContainerLevelControl | Phase 9 audited (BUG-070) |
+| integration (AE2/IC2/TIS3D/JEI) | Phase 9 audited — disabled/missing (BUG-003/004) |
+| common/EventHandler chunk unload | Phase 9 reconfirmed (BUG-056) |
+| client/gui/Robot | Phase 9 reconfirmed (BUG-042) |
 
 ---
 
@@ -368,11 +374,119 @@ Note: BUG-050/051 overlap Phase 2 BUG-045/046 with line-level proof in EventHand
 
 ### Phase 9 — pending audit scope
 
-- Integration disabled code paths: AE2, IC2, TIS3D (`Mods.scala`, commented drivers)  
-- `ContainerLevelControl` / `LevelInventoryAnalytics` deep pass  
-- Client GUI: `Robot.scala` ComponentTracker (BUG-042)  
-- `EventHandler` chunk unload double teardown (BUG-056)  
-- Merge status: `fix/p0-parity-audit-batch1` vs `dev-MC1.20`
+- ~~Integration disabled code paths~~ — **done Phase 9** (see below)  
+- ~~`ContainerLevelControl` deep pass~~ — **done** (BUG-070)  
+- ~~Client GUI Robot ComponentTracker~~ — **reconfirmed** (BUG-042)  
+- ~~`EventHandler` chunk unload double teardown~~ — **reconfirmed** (BUG-056)  
+- Merge status: `fix/p0-parity-audit-batch1` vs `dev-MC1.20` — **gap list below**  
+- Phase 10: `LinkedCard`, `Switch` block TE, `traits/Keyboard` disconnect, dev FS `fromResource`
+
+---
+
+## Phase 9 — transposer traits, integration, EventHandler, GUI (2026-06-20)
+
+**Scope:** `ContainerLevelControl.compare`, `LevelInventoryAnalytics` (reconfirm BUG-060), `Mods.scala` integration proxies, `PowerAcceptor`, JEI plugin stubs, `EventHandler.onChunkUnloaded`, `client/gui/Robot.scala` buffer source, fix-branch merge gap on `dev-MC1.20`.
+
+**Method:** Source diff only; no in-game verification.
+
+---
+
+### BUG-070 (HIGH) — `compare()` fuzzy flag not implemented on `dev-MC1.20`
+
+| | |
+|---|---|
+| **File** | `server/component/traits/ContainerLevelControl.scala` |
+| **CE (broken)** | Lines 31–32: `args.optBoolean(1, false) // TODO` then `return result(idMatches)` — fuzzy arg **discarded** |
+| **Original** | `InventoryWorldControl.scala:31-32`: `subTypeMatches = fuzzy \|\| !hasSubtypes \|\| metadata match`; returns `idMatches && subTypeMatches` |
+| **Fix branch** | `fix/p0-parity-audit-batch1` implements `blockStateMatchesStack()` for 1.20 BlockState parity |
+
+**Why wrong:** Robot/transposer `compare(side, fuzzy)` API documents fuzzy matching. CE always compares block type id only — wrong for colored/variant blocks when `fuzzy=false` should require exact state match.
+
+**Impact:** Autonomous building/mining scripts get false positives/negatives vs 1.12.
+
+**Note:** Tracked as BUG-008 on fix branch; **still open on `dev-MC1.20`**.
+
+---
+
+### BUG-020 (MED) — FlatScreen back-face cull skipped — reconfirmed
+
+| | |
+|---|---|
+| **File** | `client/renderer/tileentity/ScreenRenderer.scala:174-182` |
+| **CE** | Back-face test wrapped in `if (!isFlatScreen)` — flat tier screens skip cull |
+| **Original** | `ScreenRenderer.scala:57-60` — cull **always** applied (no flat exception) |
+
+**Impact:** Tier-2 flat screens show text when viewed from behind the block.
+
+---
+
+### BUG-056 (MED) — Chunk unload double machine teardown — reconfirmed with CE delta
+
+**Original `onChunkUnload`:** iterates chunk **entity lists** only → `scheduleClose(machine)` for `MachineHost` entities. Tile entities still get `onChunkUnload` → `dispose()` → `Computer.dispose` → `machine.stop()` separately.
+
+**CE `onChunkUnloaded` (lines 461-494):** **additionally** iterates `chunk.getBlockEntities` for `MachineHost` → `scheduleClose`, **plus** AABB entity scan → `scheduleClose` again.
+
+**CE `BaseBlockEntity.onChunkUnloaded`:** calls `dispose()` → for computers `machine.stop()` (same as Original `TileEntity`).
+
+**Double path on CE:** For a Case/RobotProxy in unloading chunk:
+1. `BaseBlockEntity.onChunkUnloaded` → `Computer.dispose` → `machine.stop()`
+2. `EventHandler.onChunkUnloaded` → `scheduleClose(machine)` → next tick `tryClose()` → `close()` again
+
+**Why it matters:** `stop()` then `tryClose()`/`close()` may duplicate signal teardown, filesystem flush, or node removal — race risk on fast chunk cycles.
+
+**CE regression vs Original:** Extra block-entity `scheduleClose` loop not present in Original 1.12 chunk unload handler.
+
+---
+
+### BUG-042 (MED) — Robot GUI buffer via ComponentTracker — reconfirmed
+
+| | |
+|---|---|
+| **CE** | `client/gui/Robot.scala:39-43` — `inventoryContainer.info.screenBuffer.flatMap(ComponentTracker.get(...)).orNull` evaluated **once** at GUI init |
+| **Original** | `Robot.scala:28-30` — `robot.components.collect { case Some(buffer: TextBuffer) => buffer }.headOption.orNull` — direct reference |
+
+**Why wrong:** If screen component registers in tracker after GUI open, `buffer == null` → 108px layout (`noScreenHeight`) while robot has screen → slot/label misalignment (256px vs 108px).
+
+---
+
+### Phase 9 — integration audit (BUG-003/004 reconfirmed)
+
+| Integration | Original `Mods.Proxies` | CE `dev-MC1.20` | Status |
+|-------------|-------------------------|-------------------|--------|
+| Applied Energistics 2 | `ModAppEng` active | `//integration.appeng.ModAppEng` commented; **no `integration/appeng/` package** | Disabled — no ME network power/items |
+| TIS3D | `ModTIS3D` active | `//integration.tis3d.ModTIS3D` commented; **no `integration/tis3d/` package** | Disabled |
+| IC2 power | `PowerAcceptor` traits | `// with power.AppliedEnergistics2` only; IC2 traits absent | Disabled (BUG-003) |
+| JEI | `ModJEI` + plugin | All `integration/jei/*.scala` **fully commented** | Disabled (BUG-004) |
+| ComputerCraft | `ModComputerCraft` | Active | OK (but Relay registration BUG-057) |
+| ProjectRed | `ModProjectRed` | Active | OK (but wrench BUG-049, bundled BUG-028) |
+
+**Conclusion:** Not merely “WIP stubs” — AE2/TIS3D integration **source removed or never ported**; enabling requires re-implementation, not uncommenting one line.
+
+---
+
+### Phase 9 — fix branches not merged to `dev-MC1.20` (reverified)
+
+| ID | File | Still broken on dev |
+|----|------|---------------------|
+| BUG-008/070 | `ContainerLevelControl.scala:31-32` | fuzzy compare TODO |
+| BUG-027 | `LevelAware.scala:87` | `getEntitiesOfClass(..., null)` NPE risk |
+| BUG-035 | `Drone.scala:105` | `getV1elocity` typo method name |
+| BUG-037 | `RedstoneAware.scala:40-51` | dead duplicate `getObjectFuzzy` branches |
+| BUG-038 | `Computer.scala:154` | `setLevel` only, no `worldPosition` on load |
+| BUG-034 | `Machine.scala` | `getDayTime` for os.time (if not merged) |
+
+Verify before release: merge `fix/p0-parity-audit-batch1` and open fix PRs #1–#4.
+
+---
+
+### Phase 9 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `ContainerLevelControl` drop/suck | Same structure as Original `InventoryWorldControl`; `mayInteract` discard **INHERITED** |
+| `LevelInventoryAnalytics` | Same as Phase 4 except BUG-060 ore-tag equivalence |
+| `Hub` trait | Queue/relay logic equivalent; dest reload still BUG-058 |
+| `LevelAware.entitiesInBounds` | Line 74 uses 2-arg `getEntitiesOfClass` — OK; only `closestEntity` line 87 broken |
 
 ---
 
