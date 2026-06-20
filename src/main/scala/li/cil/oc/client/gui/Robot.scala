@@ -33,6 +33,7 @@ class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   with traits.InputBuffer with ContainerEventHandler {
 
   override def containerTick(): Unit = {
+    flushQueuedKey()
     super.containerTick()
   }
 

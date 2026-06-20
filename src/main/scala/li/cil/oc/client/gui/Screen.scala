@@ -29,6 +29,11 @@ class Screen(val buffer: api.internal.TextBuffer, val hasMouse: Boolean, val has
 
   private var mx, my = -1
 
+  override def tick(): Unit = {
+    flushQueuedKey()
+    super.tick()
+  }
+
   override def mouseScrolled(mouseX: Double, mouseY: Double, delta: Double): Boolean = {
     if (hasMouse) {
       toBufferCoordinates(mouseX, mouseY) match {

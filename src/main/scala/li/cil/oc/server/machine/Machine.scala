@@ -529,7 +529,7 @@ class Machine(val host: MachineHost) extends AbstractManagedEnvironment with mac
     }
 
     // Update world time for time() and uptime().
-    worldTime = host.getEnvironmentLevel.getDayTime
+    worldTime = host.getEnvironmentLevel.getGameTime
     uptime += 1
 
     if (remainIdle > 0) {
