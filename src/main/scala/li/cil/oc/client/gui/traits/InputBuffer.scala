@@ -164,7 +164,7 @@ trait InputBuffer extends DisplayBuffer {
     if (!this.isInstanceOf[AbstractContainerScreen[_]] || !ItemSearch.isInputFocused) {
       flushQueuedKey()
       pressedKeys.remove(keyCode) match {
-        case Some(char) => {
+        case Some(char) if buffer != null => {
           val lwjglCode = GLFWTranslator.glfwToLWJGL(keyCode)
           if (lwjglCode > 0) {
             buffer.keyUp(char, lwjglCode, null)

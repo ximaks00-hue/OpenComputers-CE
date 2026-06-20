@@ -35,7 +35,7 @@ object DriverFileSystem extends Item {
     if (host.getEnvironmentLevel != null && host.getEnvironmentLevel.isClientSide) null
     else stack.getItem match {
       case hdd: HardDiskDrive => createEnvironment(stack, hdd.kiloBytes * 1024, hdd.platterCount, host, hdd.tier + 2)
-      case ssd: SolidStateDrive => createEnvironment(stack, ssd.kiloBytes * 1048, 1, host, ssd.tier + 4)
+      case ssd: SolidStateDrive => createEnvironment(stack, ssd.kiloBytes * 1024, 1, host, ssd.tier + 4)
       case disk: FloppyDisk => createEnvironment(stack, Settings.get.floppySize * 1024, 1, host, 1)
       case _ => null
     }

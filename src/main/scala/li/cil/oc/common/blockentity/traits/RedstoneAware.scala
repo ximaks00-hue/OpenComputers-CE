@@ -41,10 +41,10 @@ trait RedstoneAware extends RotationAware {
     val refMap: util.Map[AnyRef, AnyRef] = map.asInstanceOf[util.Map[AnyRef, AnyRef]]
     if (refMap.containsKey(key))
       Option(refMap.get(key))
-    else if (refMap.containsKey(key))
-      Option(refMap.get(key))
-    else if (refMap.containsKey(key * 1.0))
-      Option(refMap.get(key * 1.0))
+    else if (refMap.containsKey(Integer.valueOf(key)))
+      Option(refMap.get(Integer.valueOf(key)))
+    else if (refMap.containsKey(Integer.valueOf(key) * 1.0))
+      Option(refMap.get(Integer.valueOf(key) * 1.0))
     else if (refMap.containsKey(key * 1.0))
       Option(refMap.get(key * 1.0))
     else
