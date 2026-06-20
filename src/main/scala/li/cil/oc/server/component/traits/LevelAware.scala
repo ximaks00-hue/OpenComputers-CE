@@ -84,7 +84,7 @@ trait LevelAware {
 
   def closestEntity[Type <: Entity](clazz: Class[Type], side: Direction) = {
     val blockPos = position.offset(side)
-    val candidates = world.getEntitiesOfClass(clazz, blockPos.bounds, null)
+    val candidates = world.getEntitiesOfClass(clazz, blockPos.bounds)
     if (!candidates.isEmpty) Some(candidates.minBy(e => fakePlayer.distanceToSqr(e))) else None
   }
 

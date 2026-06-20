@@ -11,7 +11,6 @@ import net.minecraftforge.common.world.ForgeChunkManager.TicketHelper
 import net.minecraftforge.eventbus.api.SubscribeEvent
 
 import scala.collection.convert.ImplicitConversionsToScala._
-import scala.collection.immutable
 import scala.collection.mutable
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.ChunkPos
@@ -115,24 +114,20 @@ object ChunkloaderUpgradeHandler extends LoadingValidationCallback {
   def updateLoadedChunk(loader: UpgradeChunkloader): Unit = {
     (loader.host.getEnvironmentLevel, parseAddress(loader.node.address)) match {
       // If loader.ticket is None that means we shouldn't load anything (as did the old ticketing system).
-      case (level: ServerLevel, Some(owner)) if loader.ticket.isDefined => {
+      case (level: ServerLevel, Some(owner)) if loader.ticket.isDefined =>
         val blockPos = BlockPosition(loader.host)
         val centerChunk = new ChunkPos(blockPos.x >> 4, blockPos.z >> 4)
+        val robotChunks = (for (x <- -1 to 1; z <- -1 to 1) yield new ChunkPos(centerChunk.x + x, centerChunk.z + z)).toSet
+        val existingChunks = (for (x <- -1 to 1; z <- -1 to 1) yield new ChunkPos(loader.ticket.get.x + x, loader.ticket.get.z + z)).toSet
         if (centerChunk != loader.ticket.get) {
-          val robotChunks = (for (x <- -1 to 1; z <- -1 to 1) yield new ChunkPos(centerChunk.x + x, centerChunk.z + z)).toSet
-          val existingChunks = loader.ticket match {
-            case Some(currPos) => (for (x <- -1 to 1; z <- -1 to 1) yield new ChunkPos(currPos.x + x, currPos.z + z)).toSet
-            case None => immutable.Set.empty[ChunkPos]
-          }
           for (toRemove <- existingChunks if !robotChunks.contains(toRemove)) {
             ForgeChunkManager.forceChunk(level, OpenComputers.ID, owner, toRemove.x, toRemove.z, false, true)
           }
-          for (toAdd <- robotChunks if !existingChunks.contains(toAdd)) {
-            ForgeChunkManager.forceChunk(level, OpenComputers.ID, owner, toAdd.x, toAdd.z, true, true)
-          }
-          loader.ticket = Some(centerChunk)
         }
-      }
+        for (chunk <- robotChunks) {
+          ForgeChunkManager.forceChunk(level, OpenComputers.ID, owner, chunk.x, chunk.z, true, true)
+        }
+        loader.ticket = Some(centerChunk)
       case _ =>
     }
   }

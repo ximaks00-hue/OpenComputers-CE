@@ -16,6 +16,7 @@ import li.cil.oc.api.network._
 import li.cil.oc.api.prefab
 import li.cil.oc.api.prefab.AbstractManagedEnvironment
 import li.cil.oc.common.event.ChunkloaderUpgradeHandler
+import li.cil.oc.util.BlockPosition
 import net.minecraft.world.level.ChunkPos
 
 import scala.collection.convert.ImplicitConversionsToJava._
@@ -122,26 +123,26 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvir
     }
   }
 
-  @Deprecated
   private def isDimensionAllowed: Boolean = {
-    val id: Int = host.getEnvironmentLevel().dimension match {
-      case Level.OVERWORLD => 0
-      case Level.NETHER => -1
-      case Level.END => 1
-      case _ => throw new Error("deprecated")
+    val idOpt: Option[Int] = host.getEnvironmentLevel().dimension() match {
+      case Level.OVERWORLD => Some(0)
+      case Level.NETHER => Some(-1)
+      case Level.END => Some(1)
+      case _ => None
     }
-    val whitelist = Settings.get.chunkloadDimensionWhitelist
-    val blacklist = Settings.get.chunkloadDimensionBlacklist
-    if (!whitelist.isEmpty) {
-      if (!whitelist.contains(id))
-        return false
+    idOpt match {
+      case None => true
+      case Some(id) =>
+        val whitelist = Settings.get.chunkloadDimensionWhitelist
+        val blacklist = Settings.get.chunkloadDimensionBlacklist
+        if (!whitelist.isEmpty && !whitelist.contains(id)) {
+          false
+        } else if (!blacklist.isEmpty && blacklist.contains(id)) {
+          false
+        } else {
+          true
+        }
     }
-    if (!blacklist.isEmpty) {
-      if (blacklist.contains(id)) {
-        return false
-      }
-    }
-    true
   }
 
   private def requestTicket(throwIfBlocked: Boolean = false): Unit = {
@@ -150,8 +151,8 @@ class UpgradeChunkloader(val host: EnvironmentHost) extends AbstractManagedEnvir
         throw new Exception("this dimension is blacklisted")
       }
     } else {
-      // This ticket is a lie, but ChunkloaderUpgradeHandler won't crash or load it.
-      ticket = Some(new ChunkPos(0, 0))
+      val blockPos = BlockPosition(host)
+      ticket = Some(new ChunkPos(blockPos.x >> 4, blockPos.z >> 4))
       ChunkloaderUpgradeHandler.updateLoadedChunk(this)
     }
   }
