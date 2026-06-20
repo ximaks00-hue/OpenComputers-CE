@@ -3,13 +3,33 @@
 **対象:** `dev-MC1.20` vs Etalon `OpenComputers-Original` (MC 1.12.2)  
 **方法:** モジュール単位のソース diff、Original との行単位比較  
 **日付:** 2026-06-20  
-**Fork PR:** https://github.com/ximaks00-hue/OpenComputers-CE/pull/5 （P0 修正バッチ）
+**Docs PR:** https://github.com/ximaks00-hue/OpenComputers-CE/pull/6  
+**引き継ぎ:** [HANDOFF-PARITY-AUDIT.md](./HANDOFF-PARITY-AUDIT.md)
 
 ---
 
 ## 概要
 
 Etalon（1.12 Original）と CE（1.20 ポート）を比較し、**動作が意図的に異なるのではなく、ポート漏れ・ typo・ API 誤用**と判断できる問題を列挙します。各項目に **Original の正しい挙動**、**CE 修正前**、**CE 修正後**（該当する場合）を記載します。
+
+**監査状況:** Phase **1–13** 完了（静的ソース diff）。次は **Phase 14**（HANDOFF 参照）。
+
+### 未修正 CONFIRMED 一覧（`dev-MC1.20`、抜粋）
+
+| ID | 領域 | 概要 |
+|----|------|------|
+| BUG-010 | dev FS | `fromResource` exploded path 絶対パス |
+| BUG-017/018/024/027 | Agent/Robot/Cable | fix 分支あり、dev 未マージ |
+| BUG-050–057 | EventHandler/CC/CoFH | unload, SaveHandler, Relay 等 |
+| BUG-058/059 | Network | dest NBT 反転（058 INHERITED）、packet size |
+| BUG-060–070 | traits/Terminal/compare | ore tag, TerminalServer, fuzzy compare |
+| BUG-062–067 | Relay/Chunkloader/DebugCard/Sky | CC payload, dimension, setBlocks |
+| BUG-069 | Rack Server | `hasCapability` 欠落 |
+| BUG-071–076 | CC/Sign/Craft/Trade/Loot | DriverPeripheral, Sign, Crafting, Trade, LootDisk |
+| BUG-077–081 | Agent/Sound/Internet | yaw/pitch 入替、SE pause/volume、HTTP proxy、reach |
+| BUG-021 | Machine | `canInteract` — `isOp` vs `canSendCommands` |
+
+完全な表は [PARITY-AUDIT.md](./PARITY-AUDIT.md) の Open — CONFIRMED を参照。
 
 ---
 
@@ -307,14 +327,149 @@ CE: import コメントアウト、NBT 保存のみ。**読取は可、外部ケ
 
 ---
 
+### BUG-071 — CC `DriverPeripheral` 反射 invoke で `IComputerAccess` が null
+
+**ファイル:** `integration/computercraft/DriverPeripheral.java:195-196`
+
+| Original | CE |
+|----------|-----|
+| 常に `FakeComputerAccess` を `callMethod(access, …)` に渡す | `@LuaFunction` 反射経路で `IComputerAccess` → `null` |
+| | `IDynamicPeripheral` 経路のみ access 正常（165-170行） |
+
+**影響:** OC アダプタ経由の静的 CC 周辺機器 Lua 呼び出しが NPE / 機能不全。
+
+---
+
+### BUG-072 — `issueMainThreadTask` が 0 を返す
+
+**ファイル:** `integration/computercraft/DriverPeripheral.java:469-471`
+
+| Original | CE |
+|----------|-----|
+| `throw new UnsupportedOperationException()` | `return 0` |
+
+**影響:** 即座にエラーになるべき CC main-thread 要求が「成功扱い」になりハングの可能性。
+
+---
+
+### BUG-073 — UpgradeSign `setValue` が看板 TE に書き込まない
+
+**ファイル:** `server/component/UpgradeSign.scala:69`
+
+| Original | CE |
+|----------|-----|
+| `copyToArray(sign.signText)` | `copyToArray(getAllMessages(sign).toArray)` — **捨て配列** |
+
+**影響:** ロボット/アダプタの `sign.setValue()` が看板ブロックに反映されない。
+
+---
+
+### BUG-074 — UpgradeCrafting `assemble(this, null)`
+
+**ファイル:** `UpgradeCrafting.scala:67` — `RegistryAccess` 未指定。1.20 タグレシピで NPE/空結果。
+
+---
+
+### BUG-075 — Trade 次元 reload NPE
+
+**ファイル:** `Trade.scala:198-222` — `tryParse` null / `getLevel` null 未ガード（BUG-064/067 と同系）。
+
+---
+
+### BUG-076 — DriverLootDisk `fromResource` パス誤り
+
+**ファイル:** `DriverLootDisk.scala:32` — `Settings.savePath + "loot/" + tag` を resource path に使用（正: `loot/` + tag）。BUG-053 とは別問題。
+
+---
+
+### BUG-077 — Agent Player の yaw/pitch 入れ替え
+
+**ファイル:** `server/agent/Player.scala:97-103`
+
+| Original | CE |
+|----------|-----|
+| `setLocationAndAngles(..., yaw, pitch)` | `setYRot(pitch)`, `setXRot(yaw)` — **水平/垂直が逆** |
+
+**影響:** ロボット fake player の向きが誤り、`gameMode` 破壊/設置/アイテム使用およびピストン eye-height 判定（539行）に波及。
+
+---
+
+### BUG-078 — 一時停止中もループ SE が鳴り続ける
+
+**ファイル:** `client/Sound.scala`
+
+Original は `isGamePaused` 時に volume=0。CE は pause チェックなし。
+
+---
+
+### BUG-079 — Minecraft ブロック音量スライダーが OC SE に反映されない
+
+**ファイル:** `client/Sound.scala`
+
+Original は 50ms ごとに `SoundCategory.BLOCKS` 音量を再読込。CE は `Settings.get.soundVolume` のみ。
+
+---
+
+### BUG-080 — InternetCard HTTP プロキシの NO_PROXY フォールバック欠落
+
+**ファイル:** `InternetCard.scala:514`
+
+| Original | CE |
+|----------|-----|
+| `Option(getServerProxy).getOrElse(NO_PROXY)` | `getCurrentServer.proxy` をそのまま使用 |
+
+---
+
+### BUG-081 — Agent fake player の block reach 制限未移植
+
+**ファイル:** `server/agent/Player.scala`
+
+Original: `interactionManager.setBlockReachDistance(1)`。CE に 1.20 相当の設定なし（デフォルト ~4.5 ブロック）。
+
+---
+
+### BUG-021 — Machine `canInteract` が `isOp` のみ（Phase 13 で CONFIRMED 昇格）
+
+**ファイル:** `Machine.scala:209` — Original は `canSendCommands`。LAN チート有効・非 OP プレイヤーの挙動差。
+
+---
+
+### BUG-082 — Geolyzer `store()` が AIR スタックを DB に書き込む
+
+**ファイル:** `Geolyzer.scala:177-190`
+
+| Original | CE |
+|----------|-----|
+| `Item.getItemFromBlock(block)` → null ならエラー | `block.asItem()` — 1.20 では **null にならず** `Items.AIR` → DB に空スタック保存 |
+
+**影響:** 火/技術ブロック等で 1.12 はエラー、CE は「成功」扱い。
+
+---
+
+### BUG-083 — Geolyzer `analyze` の harvestLevel が `-1` を返さない
+
+**ファイル:** `EventHandlerVanilla.scala:71` / `ItemUtils.scala:50-55`
+
+| Original | CE |
+|----------|-----|
+| `block.getHarvestLevel(state)` — 破壊不能は **-1** | タグヒューリスティック — **0〜3 のみ** |
+
+**影響:** 岩盤等の analyze データが 1.12 と不一致。
+
+---
+
 ## D. LIKELY / INHERITED
 
 | ID | 内容 |
 |----|------|
 | BUG-036 | Drone `getOffset()` — BlockPos vs entity 座標 |
-| BUG-021 | Machine `canInteract` — `isOp` vs `canSendCommands` |
 | INHERITED | `suck()` が `mayInteract` 結果を無視（1.12 も同様） |
 | INHERITED | `getBundledOutput: Array = _bundledInput`（1.12 も同様 typo） |
+| INHERITED | Microcontroller `outputSides` NBT 読込未適用（`Microcontroller.scala:217`） |
+| INHERITED | Hologram AABB max-Z が `translation.x`（正しくは `.z`）（`Hologram.scala:457`） |
+| INHERITED | Tablet `Client.getWeak` が常に `None`（`Tablet.scala:615-622`） |
+| INHERITED | Keyboard disconnect 時 key_up TODO（両ポート） |
+| INHERITED | `Network.newPacket(nbt)` dest load 反転（BUG-058、両ポート） |
 
 ---
 
@@ -478,13 +633,73 @@ Case（tier-4 + creative Tier.Five は意図的拡張）, Capacitor, PowerDistri
 
 ### Phase 8 — 推奨 fix 優先度
 
-1. BUG-066（天空 API）→ 2. BUG-065 → 3. BUG-062/063 → 4. BUG-064/067 → 5. BUG-069
+1. BUG-066 → BUG-065 → BUG-062/063 → BUG-077/073/074 → BUG-071 → BUG-064/067/075 → BUG-069 → BUG-010/076 → **#5 マージ**
 
-### Phase 9 予定
+### Phase 9–13 予定（履歴）
 
-Phase 10: LinkedCard, Switch block TE, Keyboard disconnect, dev FS fromResource
+Phase 9–13 — **完了**（セクション N, O, P, Q, R 参照）。次: **Phase 14**（Manual, upgrades, projectred, Geolyzer）。
 
-**INHERITED:** Microcontroller `outputSides` NBT 未復元; Hologram bounding box max-Z typo
+---
+
+## O. Phase 10 — ネットワークカード / Hub / Keyboard / dev FS（2026-06-20）
+
+**BUG-010 再確認:** `FileSystem.scala:74` — exploded mod で `new File(file, "/assets/...")` が絶対パス化。JAR 分支（71行）は `substring(1)` ✓。dev/runClient で `fromResource` → null → Robot ROM / loot disk 欠落。
+
+**parity OK:** LinkedCard, QuantumNetwork, WirelessNetworkCard, Hub trait, Waypoints, Nanomachines, Tablet component, Keyboard（+ CE `text_input` 改善）。
+
+**注:** 独立 Switch ブロックなし — Relay/Rack/Microcontroller の `Hub` trait。
+
+---
+
+## P. Phase 11 — CC DriverPeripheral 等（2026-06-20、部分）
+
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-071 | HIGH | CC 反射 invoke で `IComputerAccess` = null |
+| BUG-072 | MED | `issueMainThreadTask` が 0 を返す |
+
+**parity OK:** GraphicsCard, DataCard, EEPROM, DiskDrive, Rack TE, 非 Screen renderer。
+
+---
+
+## Q. Phase 12 — upgrades / Trade / Loot（2026-06-20）
+
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-073 | HIGH | UpgradeSign `setValue` が throwaway 配列へコピーのみ |
+| BUG-074 | HIGH | UpgradeCrafting `assemble(this, null)` |
+| BUG-075 | HIGH | Trade 次元 reload NPE |
+| BUG-076 | MED | DriverLootDisk legacy `fromResource` パスに savePath 混入 |
+
+**parity OK:** Navigation/MF/Generator/Piston/TractorBeam 他 upgrades, tank traits, Loot, template/*, RedstoneSignaller, FileSystem component。
+
+---
+
+## R. Phase 13 — Agent/Player, InternetCard, Sound（2026-06-20）
+
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-077 | HIGH | Agent Player yaw/pitch 入れ替え（`Player.scala:97-103`） |
+| BUG-078 | MED | 一時停止中もループ SE 継続（`client/Sound.scala`） |
+| BUG-079 | MED | Minecraft ブロック音量スライダー未反映 |
+| BUG-080 | MED | InternetCard HTTP プロキシ NO_PROXY 欠落（`:514`） |
+| BUG-081 | MED | block reach 1 ブロック制限未移植 |
+| BUG-021 | MED | `canInteract` — `isOp` vs `canSendCommands`（CONFIRMED 昇格） |
+
+**parity OK:** InternetCard TCP（BUG-080 除く）, ControllerImpl, NetSplitter, Adapter, PacketHandler handlers, Agent 構造。
+
+---
+
+## S. Phase 14 — 予定（未監査）
+
+| モジュール | 備考 |
+|------------|------|
+| `client/Manual.scala` | マニュアルローダ |
+| 残り upgrades | Experience, Database, InventoryController |
+| `integration/projectred/*` | BUG-028/049 以外 |
+| `Geolyzer` | store/scan（BUG-066 以外） |
+
+新規 findings → **BUG-082+**。
 
 ---
 
@@ -520,11 +735,11 @@ Phase 10: LinkedCard, Switch block TE, Keyboard disconnect, dev FS fromResource
 
 ## G. 検証状況
 
-- **コード監査:** Phase 1–9 完了（Phase 9: ContainerLevelControl, integration, EventHandler, Robot GUI）
-- **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3–8 項目は **未検証**
-- **推奨 fix 優先:** BUG-066 → BUG-065 → BUG-062/063 → BUG-064/067 → BUG-069 → BUG-058 → BUG-049/057/054
+- **コード監査:** Phase 1–14 完了（Phase 14: Geolyzer store/analyze, Manual, upgrades）
+- **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3–14 項目は **未検証**
+- **推奨 fix 優先:** BUG-077 → BUG-066 → BUG-065 → BUG-062/063 → BUG-073/074 → BUG-071 → BUG-064/067/075 → BUG-010/076
 - **推奨テスト順:** os.time → compare → redstone map → robot reload → InputBuffer → 既存 PR 群
 
 ---
 
-*English registry: `docs/PARITY-AUDIT.md`（CE リポジトリ） / テストラボ: `docs/07-PARITY-AUDIT.md`*
+*English registry: `docs/PARITY-AUDIT.md` · Handoff: `docs/HANDOFF-PARITY-AUDIT.md` · Test lab: `docs/07-PARITY-AUDIT.md`*

@@ -2,9 +2,26 @@
 
 Source: systematic module-by-module comparison, 2026-06-20.  
 Etalon: `Etalon/workspace/OpenComputers-Original/`  
-CE base: `dev-MC1.20`
+CE base: `dev-MC1.20`  
+**Handoff / methodology:** [HANDOFF-PARITY-AUDIT.md](./HANDOFF-PARITY-AUDIT.md)
 
 **Confidence:** CONFIRMED = proven by source diff; LIKELY = strong logic evidence; INHERITED = same in both ports.
+
+---
+
+## Executive summary (2026-06-20)
+
+| Metric | Value |
+|--------|-------|
+| **Phases completed** | 1–14 (static source audit) |
+| **Open CONFIRMED on `dev-MC1.20`** | 57 entries (BUG-003 … BUG-083, see table below) |
+| **INHERITED** | 7+ (including BUG-058 dest NBT — both ports) |
+| **Fix PRs (code)** | #1–#5 on fork; **not merged** to dev for most items |
+| **Docs PR** | [#6](https://github.com/ximaks00-hue/OpenComputers-CE/pull/6) `docs/parity-audit-registry` |
+| **In-game verification** | Deferred — code audit first |
+| **Next audit phase** | Phase 15 (remaining server components, integration stubs, Machine lifecycle) |
+
+**Top fix priority (code):** BUG-066 → BUG-065 → BUG-062/063 → BUG-073/074 → BUG-071 → BUG-064/067/075 → BUG-010/076 → merge batch1 (#5).
 
 ---
 
@@ -30,6 +47,7 @@ CE base: `dev-MC1.20`
 |----|------|-------|
 | BUG-017 | Agent | `endConsumeDrops` missing capture clear — branch `fix/bug-015-017-*` |
 | BUG-011 | Machine | `canInteract` null-server bypass — branch `fix/parity-audit-regressions` |
+| BUG-021 | Machine | `canInteract` uses `isOp` not `canSendCommands` — `Machine.scala:209` |
 | BUG-010 | Dev FS | `fromResource()` absolute path — branch `fix/parity-audit-regressions` |
 | BUG-018 | Robot client | GUI dispose — branch `fix/bug-018`, LAN deferred |
 | BUG-024 | Cable | neighbor notify — branch `fix/bug-024` |
@@ -64,6 +82,19 @@ CE base: `dev-MC1.20`
 | BUG-069 | Server (rack) | Missing `hasCapability` on mountable Server | `Server.scala:242-251` — CE regression |
 | BUG-070 | Transposer/Robot | `compare()` ignores fuzzy flag — `optBoolean(1)` dead code | `ContainerLevelControl.scala:31-32` — CE regression (fix on batch1, not on dev) |
 | BUG-020 | Client | FlatScreen skips back-face cull — text visible from behind | `ScreenRenderer.scala:174` — CE regression |
+| BUG-071 | CC integration | `DriverPeripheral` reflection path passes `null` for `IComputerAccess` | `DriverPeripheral.java:195-196` — CE regression |
+| BUG-072 | CC integration | `UnsupportedLuaContext.issueMainThreadTask` returns `0` instead of throw | `DriverPeripheral.java:469-471` — CE regression |
+| BUG-073 | UpgradeSign | `setValue` writes to throwaway array, never updates sign TE | `UpgradeSign.scala:69` — CE regression |
+| BUG-074 | UpgradeCrafting | `assemble(this, null)` — missing `RegistryAccess` | `UpgradeCrafting.scala:67` — CE regression |
+| BUG-075 | Trade | Dimension reload NPE — `tryParse` null, `getLevel` null unguarded | `Trade.scala:198-222` — CE regression |
+| BUG-076 | DriverLootDisk | `fromResource` path includes `Settings.savePath` prefix | `DriverLootDisk.scala:32` — CE regression (extends BUG-053) |
+| BUG-077 | Agent Player | `updatePositionAndRotation` swaps yaw/pitch (`setYRot(pitch)`, `setXRot(yaw)`) | `Player.scala:97-103` — CE regression |
+| BUG-078 | Client Sound | Looping sounds not muted when integrated server paused | `client/Sound.scala` — CE regression |
+| BUG-079 | Client Sound | Block sound volume ignores Minecraft options slider changes | `client/Sound.scala` — CE regression |
+| BUG-080 | InternetCard | HTTP `openConnection` proxy — no `NO_PROXY` fallback | `InternetCard.scala:514` — CE regression |
+| BUG-081 | Agent Player | Missing block reach limit (`setBlockReachDistance(1)` not ported) | `Player.scala` — CE regression |
+| BUG-082 | Geolyzer | `store()` null-check dead — `asItem()` never null; stores `Items.AIR` | `Geolyzer.scala:177-190` — CE regression |
+| BUG-083 | Geolyzer analyze | `harvestLevel` via tag heuristic — loses `-1` for unbreakable blocks | `EventHandlerVanilla.scala:71` vs Original `:74` — CE regression |
 
 ---
 
@@ -72,7 +103,6 @@ CE base: `dev-MC1.20`
 | ID | Issue |
 |----|-------|
 | BUG-036 | Drone `getOffset()` BlockPos vs entity position distance |
-| BUG-021 | Machine `canInteract` isOp vs canSendCommands |
 
 ---
 
@@ -82,6 +112,11 @@ CE base: `dev-MC1.20`
 |-------|------|
 | `suck()` ignores `mayInteract` result | `ContainerLevelControl.scala:107` |
 | `getBundledOutput` array returns `_bundledInput` | `BundledRedstoneAware.scala:95` |
+| `Network.newPacket(nbt)` dest load inverted | `Network.scala:567-569` — both ports |
+| Microcontroller `outputSides` saved but load discards array | `Microcontroller.scala:217` — both ports |
+| Hologram AABB max-Z uses `translation.x` not `translation.z` | `Hologram.scala:457` — both ports |
+| Tablet `Client.getWeak` always returns `None` | `Tablet.scala:615-622` — both ports |
+| Keyboard key_up on disconnect TODO | `Keyboard.scala:23-24` — both ports |
 
 ---
 
@@ -121,6 +156,27 @@ CE base: `dev-MC1.20`
 | integration (AE2/IC2/TIS3D/JEI) | Phase 9 audited — disabled/missing (BUG-003/004) |
 | common/EventHandler chunk unload | Phase 9 reconfirmed (BUG-056) |
 | client/gui/Robot | Phase 9 reconfirmed (BUG-042) |
+| LinkedCard, QuantumNetwork, WirelessNetworkCard | Phase 10 parity OK |
+| Hub trait (Relay/Rack/Microcontroller switch) | Phase 10 parity OK |
+| Keyboard, Waypoints, Nanomachines, Tablet component | Phase 10 parity OK |
+| dev FS `fromResource` | Phase 10 audited (BUG-010) |
+| CC `DriverPeripheral` | Phase 11 audited (BUG-071, BUG-072) |
+| GraphicsCard, DataCard, EEPROM, DiskDrive, Rack TE | Phase 11 parity OK |
+| UpgradeSign, UpgradeCrafting, Trade, DriverLootDisk | Phase 12 audited (BUG-073–076) |
+| UpgradeNavigation/MF/Generator/Piston/TractorBeam/… | Phase 12 parity OK |
+| common/Loot, common/template/* | Phase 12 parity OK |
+| Tank traits, RedstoneSignaller, FileSystem component | Phase 12 parity OK |
+| server/agent/Player, Agent | Phase 13 audited (BUG-077, BUG-081) |
+| server/component/InternetCard | Phase 13 audited (BUG-080) |
+| client/Sound | Phase 13 audited (BUG-078, BUG-079) |
+| common/nanomachines/ControllerImpl | Phase 13 parity OK |
+| NetSplitter, Adapter blockentity | Phase 13 parity OK |
+| server/machine/Machine.canInteract | Phase 13 reconfirmed (BUG-021) |
+| server/client PacketHandler handlers | Phase 13 parity OK |
+| client/Manual, ResourceContentProvider | Phase 14 parity OK |
+| UpgradeDatabase, UpgradeInventoryController, UpgradeExperience | Phase 14 parity OK |
+| integration/projectred (beyond BUG-028/049) | Phase 14 audited — BundledProviderProjectRed OK; Charset mod absent |
+| Geolyzer store/analyze (beyond BUG-066) | Phase 14 audited (BUG-082, BUG-083) |
 
 ---
 
@@ -366,20 +422,390 @@ Note: BUG-050/051 overlap Phase 2 BUG-045/046 with line-level proof in EventHand
 1. **BUG-066** — sky API (3 files, one-line each) — highest player-visible impact  
 2. **BUG-065** — DebugCard `setBlocks` (one line)  
 3. **BUG-062/063** — Relay CC `queueMessage` flatten (one line)  
-4. **BUG-064 + BUG-067** — dimension API batch  
-5. **BUG-069** — Server `hasCapability`  
-6. Remaining open registry items (Network, integration, Agent, Robot GUI, …)
+4. **BUG-073/074** — UpgradeSign + UpgradeCrafting (player-visible, small diffs)  
+5. **BUG-071** — CC DriverPeripheral `IComputerAccess` null  
+6. **BUG-064 + BUG-067 + BUG-075** — dimension API batch (Chunkloader, DebugCard, Trade)  
+7. **BUG-069** — Server `hasCapability`  
+8. **BUG-010 + BUG-076** — dev FS + legacy loot disk paths  
+9. Merge `fix/p0-parity-audit-batch1` (#5) and open fix PRs #1–#4  
+10. Remaining open registry (Network BUG-059, integration, Robot GUI, …)
 
 ---
 
-### Phase 9 — pending audit scope
+### Phase 9–12 — audit status
+
+| Phase | Status |
+|-------|--------|
+| Phase 9 | Done — BUG-070, integration gap, BUG-056/042 reconfirmed |
+| Phase 10 | Done — BUG-010 reconfirmed; LinkedCard/Hub/Keyboard parity OK |
+| Phase 11 | Done — BUG-071/072; GraphicsCard/DiskDrive/Rack parity OK |
+| Phase 12 | Done — BUG-073/074/075/076; upgrades/Loot/templates parity OK |
+| Phase 13 | Done — BUG-077/078/079/080/081; BUG-021 reconfirmed; NetSplitter/Adapter/PacketHandler parity OK |
+| Phase 14 | Done — BUG-082/083 Geolyzer; Manual/upgrades parity OK; Charset integration absent |
+| **Phase 15** | **Pending** — Machine lifecycle, remaining server components, Print/3D printer |
+
+---
+
+### Phase 9 — pending audit scope (historical)
 
 - ~~Integration disabled code paths~~ — **done Phase 9** (see below)  
 - ~~`ContainerLevelControl` deep pass~~ — **done** (BUG-070)  
 - ~~Client GUI Robot ComponentTracker~~ — **reconfirmed** (BUG-042)  
 - ~~`EventHandler` chunk unload double teardown~~ — **reconfirmed** (BUG-056)  
 - Merge status: `fix/p0-parity-audit-batch1` vs `dev-MC1.20` — **gap list below**  
-- Phase 10: `LinkedCard`, `Switch` block TE, `traits/Keyboard` disconnect, dev FS `fromResource`
+- ~~Phase 10: LinkedCard, Switch/Hub, Keyboard, dev FS `fromResource`~~ — **done** (see below)
+- ~~Phase 11: CC `DriverPeripheral`, TabletWrapper, GraphicsCard/DiskDrive/Rack~~ — **done**
+- ~~Phase 12: upgrades, Trade, Loot, templates~~ — **done**
+
+---
+
+## Phase 13 — Agent/Player, InternetCard, Sound, blockentity (2026-06-20)
+
+**Scope:** `server/agent/Player.scala`, `server/component/Agent.scala`, `InternetCard.scala`, `client/Sound.scala`, `common/nanomachines/ControllerImpl.scala`, `NetSplitter.scala`, `Adapter.scala`, `Machine.canInteract`, PacketHandler handler bodies.
+
+**Method:** Source diff only; no in-game verification.
+
+---
+
+### BUG-077 (HIGH) — Fake player yaw/pitch swapped in `updatePositionAndRotation`
+
+| | |
+|---|---|
+| **File** | `server/agent/Player.scala:97-103` |
+| **CE (broken)** | Computes `yaw` and `pitch`, then `setYRot(pitch)`, `setXRot(yaw)` |
+| **Original** | `setLocationAndAngles(..., yaw, pitch)` — yaw first, pitch second (`Player.scala:79-81`) |
+
+**Why wrong:** In MC 1.20 `setYRot` = horizontal yaw, `setXRot` = vertical pitch. CE assigns them backwards.
+
+**Impact:** Robot fake-player look direction wrong for `gameMode` block break/place, item use, and piston eye-height hack (`getXRot < 0` at line 539 reads yaw as pitch). Affects all `rotatedPlayer()` agent actions.
+
+**Fix hint:** `setYRot(yaw % 360f); setXRot(pitch % 360f)`.
+
+---
+
+### BUG-078 (MED) — Client looping sounds play while game paused
+
+| | |
+|---|---|
+| **File** | `client/Sound.scala` |
+| **CE (broken)** | Timer callback only schedules `processQueue()` — no pause check |
+| **Original** | `updateVolume()` sets volume to `0f` when `isGamePaused` before processing queue (`Sound.scala:57-60, 71-77`) |
+
+**Impact:** Case/charger/hdd loop sounds continue at full volume when player opens pause menu on LAN/SP.
+
+---
+
+### BUG-079 (MED) — Client sound volume ignores Minecraft block-sounds slider
+
+| | |
+|---|---|
+| **File** | `client/Sound.scala:145`, `client/Sound.scala:30-36` |
+| **CE (broken)** | Volume set once from `Settings.get.soundVolume`; no runtime sync |
+| **Original** | `updateVolume()` every 50 ms reads `gameSettings.getSoundLevel(SoundCategory.BLOCKS)` (`Sound.scala:57-68, 209-211`) |
+
+**Impact:** Changing Options → Music & Sounds → Blocks has no effect on OC machine loop sounds until restart.
+
+---
+
+### BUG-080 (MED) — InternetCard HTTP proxy null-unsafe
+
+| | |
+|---|---|
+| **File** | `server/component/InternetCard.scala:514` |
+| **CE (broken)** | `ServerLifecycleHooks.getCurrentServer.proxy` passed directly |
+| **Original** | `Option(...getServerProxy).getOrElse(Proxy.NO_PROXY)` (`InternetCard.scala:516`) |
+
+**Impact:** HTTP requests from internet card may fail when server JVM proxy is unset/null.
+
+---
+
+### BUG-081 (MED) — Agent fake player missing 1-block reach limit
+
+| | |
+|---|---|
+| **File** | `server/agent/Player.scala` (missing vs Original line 167) |
+| **CE (broken)** | No block-reach initialization |
+| **Original** | `interactionManager.setBlockReachDistance(1)` |
+
+**Impact:** Default player reach (~4.5 blocks) applies to `gameMode` break paths vs 1.12 adjacent-only robot semantics.
+
+---
+
+### BUG-021 reconfirmed (MED) — `Machine.canInteract` uses `isOp` not `canSendCommands`
+
+Promoted from LIKELY → **CONFIRMED** (Phase 13). CE `Machine.scala:209` vs Original `Machine.scala:198`.
+
+---
+
+### Phase 13 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `InternetCard` TCP/HTTP callbacks, filtering, owner lifecycle | Equivalent except BUG-080 |
+| `ControllerImpl` wireless commands | Equivalent; `Math.sqrt` distance misnamed `dSquared` **INHERITED** |
+| `NetSplitter`, `Adapter` | Side/driver attach logic equivalent |
+| `server/PacketHandler`, `client/PacketHandler` | Handler set matches Phase 8 opcode symmetry |
+| `Agent.scala` swing/use/drop | Structure equivalent; relies on `Player` (BUG-077/081) |
+
+---
+
+## Phase 14 — pending audit scope (2026-06-20)
+
+| Module | Notes |
+|--------|-------|
+| `client/Manual.scala` | Markdown manual loader |
+| Remaining upgrades | Experience, Database, InventoryController, … |
+| `integration/projectred/*` | Beyond BUG-028/049 |
+| `server/component/Geolyzer` | store/scan beyond BUG-066 |
+| `server/machine/Machine.scala` | Beyond BUG-011/021/034 |
+
+**Method:** Same static diff; new findings → BUG-082+.
+
+---
+
+## Phase 14 — Manual, upgrades, Geolyzer, projectred (2026-06-20)
+
+**Scope:** `client/Manual.scala`, `ResourceContentProvider`, `UpgradeDatabase`/`UpgradeInventoryController`/`UpgradeExperience`/`UpgradeNavigation`, `Geolyzer.store`/`analyze`, `integration/minecraft/EventHandlerVanilla` (Geolyzer handlers), `integration/projectred/*`, `BundledRedstoneAware` vs Original IBundledTile/Charset.
+
+**Method:** Source diff only; no in-game verification.
+
+---
+
+### BUG-082 (HIGH) — Geolyzer `store()` writes AIR stacks for blocks without item form
+
+| | |
+|---|---|
+| **File** | `server/component/Geolyzer.scala:177-190` |
+| **CE (broken)** | `val item = blockState.getBlock().asItem()` then `if (item == null)` — **never true** in MC 1.20 (`asItem()` returns `Items.AIR`) |
+| **Original** | `Item.getItemFromBlock(block)` — **can return null** (`Geolyzer.scala:172-173`) → error `"block has no registered item representation"` |
+
+**Why wrong:** Blocks without item representation (fire, technical blocks, …) should fail. CE falls through to `new ItemStack(item, 1)` with AIR and **stores empty stack in database**.
+
+**Impact:** `geolyzer.store()` reports success with useless AIR entry vs 1.12 error.
+
+**Fix hint:** `if (item == Items.AIR || blockState.isAir)` before database write.
+
+---
+
+### BUG-083 (MED) — Geolyzer `analyze` harvestLevel loses unbreakable `-1`
+
+| | |
+|---|---|
+| **File** | `integration/minecraft/EventHandlerVanilla.scala:71` |
+| **CE (broken)** | `ItemUtils.getHarvestLevel(state)` — tag heuristic returning **0–3 only** (`ItemUtils.scala:50-55`) |
+| **Original** | `block.getHarvestLevel(blockState)` — returns **-1** for unbreakable blocks e.g. bedrock (`EventHandlerVanilla.scala:74`) |
+
+**Why wrong:** 1.20 port replaced block-specific harvest level with coarse tag check. Unbreakable blocks report `harvestLevel = 0` instead of `-1`.
+
+**Impact:** Lua scripts distinguishing bedrock/barrier from breakable stone get wrong analyze data.
+
+**Fix hint:** If `state.getDestroySpeed(world, pos) < 0` return `-1`; else use tag tiers.
+
+---
+
+### Phase 14 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `client/Manual.scala` | Language lookup, redirects, providers — equivalent (1.20 GUI API port) |
+| `ResourceContentProvider` | Asset loading via `ResourceManager` — equivalent |
+| `UpgradeDatabase` | Hash/clone/copy callbacks — equivalent |
+| `UpgradeInventoryController` | Trait renames only; inherits BUG-070 fuzzy via traits |
+| `UpgradeExperience`, `UpgradeNavigation` | Equivalent |
+| `ModProjectRed` + `BundledProviderProjectRed` | Input via API; output via provider (BUG-028 trait export still open) |
+| `Geolyzer` scan/isSunVisible | Equivalent except BUG-066 sky API |
+| Charset (`ModCharset`) | **Not ported** — package absent (integration gap, like AE2) |
+
+---
+
+## Phase 15 — pending audit scope (2026-06-20)
+
+| Module | Notes |
+|--------|-------|
+| `server/machine/Machine.scala` | close/stop/sleep lifecycle beyond BUG-011/021/034 |
+| Print/3D printer components | Not deeply audited |
+| Remaining `server/component/*` | Filesystem, Printer, MotionSensor edge cases |
+| `integration/cofh/*` | Reverify BUG-054/055 |
+
+---
+
+## Phase 10 — network cards, Hub, Keyboard, dev FS (2026-06-20)
+
+**Scope:** `LinkedCard`, `QuantumNetwork`, `WirelessNetworkCard`, `NetworkCard`, `Hub` trait, `Keyboard`, `FileSystem.fromResource`, `Waypoints`, `NanomachinesHandler`, `Tablet` component.
+
+**Method:** Source diff only; no in-game verification.
+
+---
+
+### BUG-010 (HIGH) — `fromResource()` exploded-mod path uses absolute inner path — reconfirmed on `dev-MC1.20`
+
+| | |
+|---|---|
+| **File** | `server/fs/FileSystem.scala:63-79` |
+| **CE (broken, line 74)** | `new io.File(file, innerPath)` where `innerPath = "/assets/..."` (leading `/`) |
+| **CE (JAR branch, line 71)** | `ZipFileInputStreamFileSystem.fromFile(file, innerPath.substring(1))` ✓ |
+| **Original** | N/A — used `fromClass()` with `new File(new File(dir), innerPath)` relative join |
+| **Fix branch** | `fix/parity-audit-regressions` uses `substring(1)` for exploded dir |
+
+**Why wrong:** On Unix, `new File(parent, "/assets/...")` ignores `parent` — path resolves to filesystem root `/assets/...`, not inside mod sources. JAR branch strips leading `/`; exploded branch does not — **inconsistent and broken in dev/runClient**.
+
+**Impact:** `fromResource` returns `null` in exploded classpath → `Robot.scala:40-41` `romRobot` empty → robot Lua `component/robot` API missing in dev; loot disks from `Loot.scala:161` / `DriverLootDisk.scala:32` fail similarly.
+
+---
+
+### Phase 10 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `LinkedCard.scala` | Logic equivalent; `Connector` cast for energy is port-only |
+| `ConverterLinkedCard.scala` | Same as Original (always default tunnel `"creative"`) |
+| `DriverLinkedCard.scala` | Same; tunnel loaded via component NBT on item mount |
+| `QuantumNetwork.scala`, `WirelessNetworkCard.scala`, `NetworkCard.scala` | Equivalent |
+| `WirelessNetworkCardHandler.scala` | Robot move → wireless update — equivalent |
+| `Hub.scala` | Queue save/load, relay, plug routing — equivalent; queue dest reload still **BUG-058 INHERITED** |
+| `Keyboard.scala` (server) | Same + CE adds `text_input` handler (improvement); disconnect key_up TODO **INHERITED** |
+| `common/blockentity/Keyboard.scala` | TE wrapper equivalent |
+| `Waypoints.scala`, `Waypoint.scala` TE | RTree index + events — equivalent |
+| `NanomachinesHandler.scala` | Respawn/save/load/disconnect — equivalent |
+| `Tablet.scala` (component) | `getXRot`/`getYRot` port of pitch/yaw — equivalent |
+
+**Note:** No separate Switch block in either port — switching is `Hub` trait on Relay, Rack, Microcontroller.
+
+---
+
+## Phase 11 — CC DriverPeripheral, item hosts (2026-06-20, partial)
+
+**Scope:** `integration/computercraft/DriverPeripheral.java`, `Tablet.scala`, `GraphicsCard`, `DataCard`, `EEPROM`, `DiskDrive`, `Rack` TE, non-Screen client renderers.
+
+---
+
+### BUG-071 (HIGH) — CC peripheral reflection invoke passes `null` `IComputerAccess`
+
+| | |
+|---|---|
+| **File** | `integration/computercraft/DriverPeripheral.java:179-196` |
+| **CE (broken)** | `buildInvokeArguments`: `if (type == IComputerAccess.class) invokeArgs[i] = null` |
+| **CE (OK path)** | `IDynamicPeripheral.callMethod(access, …)` at lines 165-170 passes live `FakeComputerAccess` |
+| **Original** | All peripherals via `peripheral.callMethod(access, …)` — access always set (lines 109-120) |
+
+**Why wrong:** CE 1.20 port added `@LuaFunction` reflection for non-dynamic CC peripherals but never passes the `FakeComputerAccess` built in `invoke()`. Any CC block peripheral method with `IComputerAccess` first parameter gets `null` → NPE or broken mount/queueEvent/getID.
+
+**Impact:** OC adapter → static CC peripherals (common in older CC mods) fail when called from Lua.
+
+---
+
+### BUG-072 (MED) — `issueMainThreadTask` silently returns 0
+
+| | |
+|---|---|
+| **File** | `integration/computercraft/DriverPeripheral.java:469-471` |
+| **CE** | `return 0;` |
+| **Original** | `throw new UnsupportedOperationException();` (`DriverPeripheral.java:257-258`) |
+
+**Why wrong:** Original fails fast when CC peripheral requests main-thread scheduling through OC stub context. CE returns task id `0`, which callers may treat as success → hang instead of immediate error.
+
+---
+
+### Phase 11 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `GraphicsCard.scala` | Equivalent; tier-4 extension intentional |
+| `DataCard.scala`, `EEPROM.scala` | Same algorithms |
+| `DiskDrive` TE + mountable | eject/media/NBT equivalent |
+| `Rack.scala` | Node mapping, relay, power — equivalent (Server `hasCapability` still BUG-069) |
+| `server/fs/*` (except `fromResource`) | Virtual/Buffered/Zip/Composite — equivalent |
+| Client renderers (non-Screen) | Robot, Rack, DiskDrive, Hologram, Case, Buffer — port-faithful |
+
+### Phase 11 — INHERITED (same in both ports)
+
+| Issue | File:line |
+|-------|-----------|
+| Microcontroller `nbt.getBooleanArray(OutputsTag)` not assigned to `outputSides` | CE `Microcontroller.scala:217`, Original `:212` |
+| Hologram bounding box max-Z uses `translation.x` instead of `translation.z` | CE `Hologram.scala:457`, Original `:455` |
+| Tablet `Client.getWeak` always returns `None` | `Tablet.scala:615-622` — both ports |
+| Keyboard key_up on disconnect TODO | `Keyboard.scala:23-24` — both ports |
+
+---
+
+## Phase 12 — upgrades, Trade, Loot, templates (2026-06-20)
+
+**Scope:** `UpgradeSign`, `UpgradeCrafting`, `Trade`, `DriverLootDisk`, remaining upgrades (Navigation, MF, Generator, Piston, TractorBeam, Leash, Angel, Battery, Trading, BarcodeReader, Tank/*), tank/level traits, `common/Loot`, `common/template/*`, `RedstoneSignaller`, FileSystem component.
+
+**Method:** Source diff only; no in-game verification.
+
+---
+
+### BUG-073 (HIGH) — UpgradeSign `setValue` never persists text to sign block
+
+| | |
+|---|---|
+| **File** | `server/component/UpgradeSign.scala:69-74` |
+| **CE (broken)** | `lines.map(...).copyToArray(getAllMessages(sign).toArray)` — copies into **new throwaway array** from read-only `getFrontText` messages |
+| **Original** | `lines.map(...).copyToArray(sign.signText)` — writes directly to TE sign text storage |
+
+**Why wrong:** `getAllMessages(sign).toArray` allocates fresh `Component` array; `copyToArray` mutates that array, not the block entity. Sign block text unchanged; Post event fires with stale content.
+
+**Impact:** Robot/adapter `component.sign.setValue()` appears to succeed but sign in world unchanged. Affects `UpgradeSignInRotatable` and `UpgradeSignInAdapter`.
+
+---
+
+### BUG-074 (HIGH) — UpgradeCrafting passes null `RegistryAccess` to recipe assemble
+
+| | |
+|---|---|
+| **File** | `server/component/UpgradeCrafting.scala:67` |
+| **CE (broken)** | `craft.get.assemble(this, null)` |
+| **Original** | `craft.getCraftingResult(this)` — no registry parameter |
+
+**Why wrong:** MC 1.20 `CraftingRecipe.assemble(container, registryAccess)` requires valid `RegistryAccess` for tag/component ingredient resolution. `null` → NPE or empty result for most modern recipes.
+
+**Impact:** Robot `component.crafting.craft()` fails or crafts zero for tag-based recipes; batch loop aborts.
+
+**Fix hint:** `host.getEnvironmentLevel.registryAccess()` (or server registry access).
+
+---
+
+### BUG-075 (HIGH) — Trade userdata reload crashes on dimension lookup
+
+| | |
+|---|---|
+| **File** | `server/component/Trade.scala:198-222` |
+| **CE (broken)** | `ResourceLocation.tryParse(nbt.getString(DimensionIDTag))` → used without null check; `ResourceKey.create(Registries.DIMENSION, dimension)` NPE; `getLevel(dimKey)` may return null → `world.getEntity` / `getBlockEntity` NPE |
+| **Original** | `nbt.getInteger(DimensionIDTag)` + `DimensionManager.getWorld(dimension)` — int dim IDs |
+
+**Why wrong:** Same class of bug as **BUG-064/BUG-067** — string dimension migration without null-safe parse or fallback.
+
+**Impact:** Persisted trade upgrade userdata fails after world restart; corrupt/legacy NBT crashes load path.
+
+---
+
+### BUG-076 (MED) — DriverLootDisk legacy fallback uses wrong resource path
+
+| | |
+|---|---|
+| **File** | `integration/opencomputers/DriverLootDisk.scala:25-32` |
+| **CE (broken)** | `lootPath = Settings.savePath + "loot/" + tag` then `fromResource(ResourceLocation(domain, lootPath))` |
+| **Original** | `lootPath = "loot/" + tag` then `fromClass(..., "loot/" + tag)` |
+
+**Why wrong:** Asset path must be `loot/<name>`, not `opencomputers/loot/<name>`. Related to **BUG-053** (double `savePath` on save-directory branch) but distinct: **resource** fallback points at non-existent asset location.
+
+**Impact:** Pre-1.5.10 legacy loot floppies fail to mount FS when save copy missing.
+
+---
+
+### Phase 12 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `UpgradeNavigation`, `UpgradeMF`, `UpgradeGenerator`, `UpgradePiston` | Equivalent |
+| `UpgradeTractorBeam`, `UpgradeLeash`, `UpgradeAngel`, `UpgradeBattery` | Equivalent |
+| `UpgradeTrading`, `UpgradeBarcodeReader`, `UpgradeTank`, `UpgradeTankController` | Equivalent |
+| Tank/level traits (`TankControl`, `LevelControl`, `InventoryTransfer`, `NetworkAware`) | Renamed from Original `*World*` traits; logic equivalent |
+| `RedstoneSignaller`, FileSystem component | Equivalent |
+| `common/Loot.scala` | World disk init equivalent (uses `fromResource` → BUG-010 in dev) |
+| `common/template/*` (Robot, Microcontroller, Tablet) | Assembler recipes equivalent |
+| `Geolyzer` (beyond BUG-066 sky API) | `scan`/`analyze`/`store` OK |
 
 ---
 
@@ -474,8 +900,22 @@ Note: BUG-050/051 overlap Phase 2 BUG-045/046 with line-level proof in EventHand
 | BUG-037 | `RedstoneAware.scala:40-51` | dead duplicate `getObjectFuzzy` branches |
 | BUG-038 | `Computer.scala:154` | `setLevel` only, no `worldPosition` on load |
 | BUG-034 | `Machine.scala` | `getDayTime` for os.time (if not merged) |
+| BUG-010/011 | `FileSystem.scala`, `Machine.scala` | on `fix/parity-audit-regressions`, not dev |
 
 Verify before release: merge `fix/p0-parity-audit-batch1` and open fix PRs #1–#4.
+
+---
+
+### Phase 9–12 — new CONFIRMED since Phase 8 (summary)
+
+| Phase | IDs | Theme |
+|-------|-----|-------|
+| 9 | BUG-070 | `compare()` fuzzy flag discarded on dev |
+| 10 | BUG-010 | `fromResource` exploded-dir absolute path |
+| 11 | BUG-071, 072 | CC DriverPeripheral reflection + main-thread task |
+| 12 | BUG-073, 074, 075, 076 | Sign, Crafting, Trade reload, LootDisk resource path |
+| 13 | BUG-077, 078, 079, 080, 081 | Agent yaw/pitch, Sound pause/volume, HTTP proxy, block reach; BUG-021 reconfirmed |
+| 14 | BUG-082, 083 | Geolyzer store AIR / analyze harvestLevel |
 
 ---
 
@@ -490,4 +930,4 @@ Verify before release: merge `fix/p0-parity-audit-batch1` and open fix PRs #1–
 
 ---
 
-*CE repo: `docs/PARITY-AUDIT.md` (PR #6) · Test lab mirror: `docs/07-PARITY-AUDIT.md`*
+*CE repo: `docs/PARITY-AUDIT.md` (PR #6) · Test lab mirror: `docs/07-PARITY-AUDIT.md` · Handoff: `docs/HANDOFF-PARITY-AUDIT.md`*
