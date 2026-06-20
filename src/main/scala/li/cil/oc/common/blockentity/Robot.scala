@@ -401,7 +401,7 @@ class Robot(pos: BlockPos, state: BlockState)
     super.dispose()
     if (isClient) {
       Minecraft.getInstance.screen match {
-        case robotGui: gui.Robot if robotGui.inventoryContainer.otherInventory == this =>
+        case robotGui: gui.Robot if robotGui.robot == this =>
           robotGui.onClose()
         case _ =>
       }
@@ -607,7 +607,7 @@ class Robot(pos: BlockPos, state: BlockState)
     }
     else if (isClient) {
       Minecraft.getInstance.screen match {
-        case robotGui: gui.Robot if robotGui.inventoryContainer.otherInventory == this =>
+        case robotGui: gui.Robot if robotGui.robot == this =>
           robotGui.onClose()
         case _ =>
       }

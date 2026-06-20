@@ -12,6 +12,7 @@ import li.cil.oc.client.gui.widget.ProgressBar
 import li.cil.oc.client.renderer.TextBufferRenderCache
 import li.cil.oc.client.renderer.gui.BufferRenderer
 import li.cil.oc.client.{PacketSender => ClientPacketSender}
+import li.cil.oc.common.blockentity
 import li.cil.oc.common.menu
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.Button
@@ -31,6 +32,8 @@ import net.minecraft.client.gui.GuiGraphics
 class Robot(state: menu.Robot, playerInventory: Inventory, name: Component)
   extends DynamicGuiContainer(state, playerInventory, name)
   with traits.InputBuffer with ContainerEventHandler {
+
+  def robot: blockentity.Robot = inventoryContainer.otherInventory.asInstanceOf[blockentity.Robot]
 
   override def containerTick(): Unit = {
     super.containerTick()
