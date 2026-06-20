@@ -549,20 +549,6 @@ Promoted from LIKELY → **CONFIRMED** (Phase 13). CE `Machine.scala:209` vs Ori
 
 ---
 
-## Phase 14 — pending audit scope (2026-06-20)
-
-| Module | Notes |
-|--------|-------|
-| `client/Manual.scala` | Markdown manual loader |
-| Remaining upgrades | Experience, Database, InventoryController, … |
-| `integration/projectred/*` | Beyond BUG-028/049 |
-| `server/component/Geolyzer` | store/scan beyond BUG-066 |
-| `server/machine/Machine.scala` | Beyond BUG-011/021/034 |
-
-**Method:** Same static diff; new findings → BUG-082+.
-
----
-
 ## Phase 14 — Manual, upgrades, Geolyzer, projectred (2026-06-20)
 
 **Scope:** `client/Manual.scala`, `ResourceContentProvider`, `UpgradeDatabase`/`UpgradeInventoryController`/`UpgradeExperience`/`UpgradeNavigation`, `Geolyzer.store`/`analyze`, `integration/minecraft/EventHandlerVanilla` (Geolyzer handlers), `integration/projectred/*`, `BundledRedstoneAware` vs Original IBundledTile/Charset.

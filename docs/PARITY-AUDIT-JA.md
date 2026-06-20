@@ -12,7 +12,7 @@
 
 Etalon（1.12 Original）と CE（1.20 ポート）を比較し、**動作が意図的に異なるのではなく、ポート漏れ・ typo・ API 誤用**と判断できる問題を列挙します。各項目に **Original の正しい挙動**、**CE 修正前**、**CE 修正後**（該当する場合）を記載します。
 
-**監査状況:** Phase **1–13** 完了（静的ソース diff）。次は **Phase 14**（HANDOFF 参照）。
+**監査状況:** Phase **1–14** 完了（静的ソース diff）。次は **Phase 15**。
 
 ### 未修正 CONFIRMED 一覧（`dev-MC1.20`、抜粋）
 
@@ -27,6 +27,7 @@ Etalon（1.12 Original）と CE（1.20 ポート）を比較し、**動作が意
 | BUG-069 | Rack Server | `hasCapability` 欠落 |
 | BUG-071–076 | CC/Sign/Craft/Trade/Loot | DriverPeripheral, Sign, Crafting, Trade, LootDisk |
 | BUG-077–081 | Agent/Sound/Internet | yaw/pitch 入替、SE pause/volume、HTTP proxy、reach |
+| BUG-082–083 | Geolyzer | store AIR 保存、analyze harvestLevel `-1` 欠落 |
 | BUG-021 | Machine | `canInteract` — `isOp` vs `canSendCommands` |
 
 完全な表は [PARITY-AUDIT.md](./PARITY-AUDIT.md) の Open — CONFIRMED を参照。
@@ -637,7 +638,7 @@ Case（tier-4 + creative Tier.Five は意図的拡張）, Capacitor, PowerDistri
 
 ### Phase 9–13 予定（履歴）
 
-Phase 9–13 — **完了**（セクション N, O, P, Q, R 参照）。次: **Phase 14**（Manual, upgrades, projectred, Geolyzer）。
+Phase 9–14 — **完了**（セクション N–S 参照）。次: **Phase 15**。
 
 ---
 
@@ -690,16 +691,18 @@ Phase 9–13 — **完了**（セクション N, O, P, Q, R 参照）。次: **P
 
 ---
 
-## S. Phase 14 — 予定（未監査）
+## S. Phase 14 — Manual, upgrades, Geolyzer, projectred（2026-06-20）
 
-| モジュール | 備考 |
-|------------|------|
-| `client/Manual.scala` | マニュアルローダ |
-| 残り upgrades | Experience, Database, InventoryController |
-| `integration/projectred/*` | BUG-028/049 以外 |
-| `Geolyzer` | store/scan（BUG-066 以外） |
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-082 | HIGH | Geolyzer `store()` — `asItem()==null` チェック无效、AIR を DB 保存 |
+| BUG-083 | MED | Geolyzer analyze — harvestLevel が破壊不能 `-1` を返さない |
 
-新規 findings → **BUG-082+**。
+**parity OK:** Manual, ResourceContentProvider, UpgradeDatabase/InventoryController/Experience/Navigation, Geolyzer scan（BUG-066 除く）, ModProjectRed provider。
+
+**integration gap:** Charset (`ModCharset`) パッケージ欠落。
+
+**次:** Phase 15 — Machine lifecycle, Print/3D printer, cofh reverify。
 
 ---
 

@@ -4,7 +4,7 @@ Systematic comparison of **OpenComputers-CE** (`dev-MC1.20`) against the **Origi
 
 | Document | Audience | Contents |
 |----------|----------|----------|
-| [PARITY-AUDIT.md](./PARITY-AUDIT.md) | Developers | English bug registry (BUG-003…081), module coverage, phase notes |
+| [PARITY-AUDIT.md](./PARITY-AUDIT.md) | Developers | English bug registry (BUG-003…083), module coverage, phase notes |
 | [PARITY-AUDIT-JA.md](./PARITY-AUDIT-JA.md) | Maintainers (@akki697222) | Full Japanese report with before/after code evidence |
 | [HANDOFF-PARITY-AUDIT.md](./HANDOFF-PARITY-AUDIT.md) | Any contributor | Methodology, phase status, paths, prompt for new chat |
 | [PR_COMMENT_JA.md](./PR_COMMENT_JA.md) | Upstream PR comment | Japanese summary for maintainers |
@@ -15,9 +15,9 @@ Systematic comparison of **OpenComputers-CE** (`dev-MC1.20`) against the **Origi
 
 | Item | Value |
 |------|-------|
-| Phases | **1–13 complete** (static audit) |
-| Open CONFIRMED | ~55 entries on `dev-MC1.20` (BUG-003…081) |
-| Next phase | **14** — Manual, remaining upgrades, projectred, Geolyzer |
+| Phases | **1–14 complete** (static audit) |
+| Open CONFIRMED | ~57 entries on `dev-MC1.20` (BUG-003…083) |
+| Next phase | **15** — Machine lifecycle, Print/3D printer, remaining components |
 | In-game verification | Not started (by design) |
 
 ## Methodology
@@ -42,4 +42,4 @@ Systematic comparison of **OpenComputers-CE** (`dev-MC1.20`) against the **Origi
 
 BUG-066 → BUG-065 → BUG-062/063 → BUG-077/073/074 → BUG-071 → BUG-064/067/075 → BUG-010/076 → merge #5.
 
-*Last updated: 2026-06-20 — Phases 1–13 code audit complete.*
+*Last updated: 2026-06-20 — Phases 1–14 code audit complete.*

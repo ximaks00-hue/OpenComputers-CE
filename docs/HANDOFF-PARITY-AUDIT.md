@@ -47,7 +47,7 @@ Systematic **static source audit** of **OpenComputers-CE** (MC 1.20) vs **OpenCo
 
 ---
 
-## 4. Phases completed (1–13)
+## 4. Phases completed (1–14)
 
 | Phase | Scope | Key CONFIRMED |
 |-------|--------|---------------|
@@ -62,8 +62,9 @@ Systematic **static source audit** of **OpenComputers-CE** (MC 1.20) vs **OpenCo
 | 11 | CC DriverPeripheral, DiskDrive, Rack | BUG-071, 072 |
 | 12 | Upgrades, Trade, Loot | BUG-073–076 |
 | 13 | Agent/Player, InternetCard, Sound, blockentity | BUG-077–081, BUG-021 |
+| 14 | Manual, upgrades, Geolyzer, projectred | BUG-082, 083 |
 
-**Open CONFIRMED count:** ~55 (BUG-003 … BUG-081) on `dev-MC1.20`.
+**Open CONFIRMED count:** ~57 (BUG-003 … BUG-083) on `dev-MC1.20`.
 
 ---
 
@@ -94,17 +95,16 @@ Also: `fix/parity-audit-regressions` — BUG-010, BUG-011.
 
 ---
 
-## 7. Phase 14 — continue here
+## 7. Phase 15 — continue here
 
 | Module | Notes |
 |--------|-------|
-| `client/Manual.scala` | Markdown manual loader |
-| Remaining upgrades | Experience, Database, InventoryController |
-| `integration/projectred/*` | Beyond BUG-028/049 |
-| `Geolyzer` | store/scan beyond BUG-066 |
-| `Machine.scala` | Beyond BUG-011/021/034 |
+| `server/machine/Machine.scala` | close/stop/sleep lifecycle beyond BUG-011/021/034 |
+| Print / 3D printer | Not deeply audited |
+| Remaining `server/component/*` | Printer, MotionSensor edge cases |
+| `integration/cofh/*` | Reverify BUG-054/055 |
 
-New findings → **BUG-082+**.
+New findings → **BUG-084+**.
 
 ---
 
@@ -119,8 +119,8 @@ Branch: docs/parity-audit-registry (PR #6)
 Base: dev-MC1.20
 
 STATIC diff only. No in-game tests. No fixes on dev.
-Phases 1–13 done. Open BUG-003…081.
-Continue Phase 14 per HANDOFF §7.
+Phases 1–14 done. Open BUG-003…083.
+Continue Phase 15 per HANDOFF §7.
 ```
 
 ---
