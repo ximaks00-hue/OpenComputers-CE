@@ -358,6 +358,18 @@ CE: import コメントアウト、NBT 保存のみ。**読取は可、外部ケ
 
 ---
 
+## J. Phase 5 — 新規 CONFIRMED / 再確認（2026-06-20）
+
+| ID | 重要度 | 問題 |
+|----|--------|------|
+| BUG-061 | MED | TerminalServer 仮想 buffer: CE `Tier.Four` (190×60, 16bit) vs Original `Tier.Three` (160×50, 8bit) |
+
+**dev-MC1.20 上で再確認（fix 分支あり）:** BUG-017 Agent drops, BUG-018 Robot GUI, BUG-011/021 canInteract
+
+**parity OK:** Agent swing/use/place ロジック, WirelessNetwork, luaj/luac OSAPI（BUG-034 で修正）
+
+---
+
 ## F. PR 一覧（fork: ximaks00-hue）
 
 | PR | ブランチ | 内容 | 状態 |
@@ -373,7 +385,7 @@ CE: import コメントアウト、NBT 保存のみ。**読取は可、外部ケ
 
 ## G. 検証状況
 
-- **コード監査:** Phase 1–4 完了（server/network/integration/client 主要部）
+- **コード監査:** Phase 1–5 完了
 - **in-game 検証:** #1 一部 PASS。P0 batch (#5) および Phase 3/4 項目は **未検証**
 - **推奨 fix 優先:** BUG-058 → BUG-049/057/054 → BUG-052 → BUG-059 → BUG-043
 - **推奨テスト順:** os.time → compare → redstone map → robot reload → InputBuffer → 既存 PR 群
