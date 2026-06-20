@@ -54,6 +54,7 @@ CE base: `dev-MC1.20`
 | BUG-058 | server/network | `newPacket(nbt)` dest load inverted | `Network.scala:567-569` |
 | BUG-059 | server/network | `Packet.size` null/none = 4 bytes (was 1) | `Network.scala:709` |
 | BUG-060 | transposer traits | `areStacksEquivalent` uses all item tags, not ore tags | `LevelInventoryAnalytics.scala:70-73` |
+| BUG-061 | TerminalServer | Buffer max tier `Tier.Four` (190×60, 16-bit) vs Original `Tier.Three` (160×50, 8-bit) | `TerminalServer.scala:45-47` |
 
 ---
 
@@ -97,7 +98,11 @@ CE base: `dev-MC1.20`
 | client/renderer | Audited (BUG-020,043 open) |
 | integration | Phase 3 partial |
 | common/EventHandler, SaveHandler | Phase 3 audited |
-| common/PacketHandler | Phase 3 partial |
+| server/network/WirelessNetwork | Phase 5 parity OK |
+| server/component/Agent | Phase 5 audited (BUG-017 on dev) |
+| common/component/TerminalServer | Phase 5 audited (BUG-061) |
+| server/machine/luaj, luac | Phase 5 OK (worldTime via BUG-034) |
+| client/PacketHandler | Phase 5 partial (server-side gaps inherited) |
 | common/entity/Drone | Parity OK |
 | server/machine/ArgumentsImpl | Parity OK |
 
@@ -154,4 +159,32 @@ Note: BUG-050/051 overlap Phase 2 BUG-045/046 with line-level proof in EventHand
 
 ---
 
-*Update after each fix branch merge and in-game verify.*
+## Phase 5 — new CONFIRMED findings (2026-06-20)
+
+| ID | Sev | Module | Issue | Evidence |
+|----|-----|--------|-------|----------|
+| BUG-061 | MED | TerminalServer | Virtual screen buffer uses **Tier.Four** resolution/color depth | Original `Tier.Three` → CE gives 190×60 @ 16-bit instead of 160×50 @ 8-bit. Remote terminal UI exceeds 1.12 capability. |
+
+### Phase 5 — reconfirmed on `dev-MC1.20` (fix branches exist)
+
+| ID | File | Proof |
+|----|------|-------|
+| BUG-017 | `Agent.scala:314-327` | `endConsumeDrops` never clears captured drops list after consume (Original `capturedDrops.clear()` line 327) |
+| BUG-018 | `Robot.scala:404` | `robotGui.inventoryContainer.otherInventory == this` always false; Original uses `robotGui.robot == this` |
+| BUG-011 | `Machine.scala:205` | `getCurrentServer == null` short-circuits to allow interaction — not in Original |
+| BUG-021 | `Machine.scala:209` | `config.isOp` vs Original `config.canSendCommands` |
+
+### Phase 5 — reviewed, parity OK
+
+| Module | Notes |
+|--------|-------|
+| `Agent.scala` swing/use/place | Same algorithm; sneaky via `Pose.CROUCHING` (port of `setSneaking`) |
+| `WirelessNetwork.scala` | Dimension key + obstruction logic equivalent |
+| `WirelessNetworkCard.scala` | join/update/leave wireless network equivalent |
+| `luaj/OSAPI.scala`, `luac/OSAPI.scala` | Both read `machine.worldTime` — fixed by BUG-034 in PR #5 |
+| `Terminal.scala` | Client-side range check + GUI; port of 1.12 `GuiType.Terminal` flow |
+| `onRobotStateRequest` | No distance check — **inherited** in Original |
+
+---
+
+*CE repo: `docs/PARITY-AUDIT.md` (PR #6) · Test lab mirror: `docs/07-PARITY-AUDIT.md`*

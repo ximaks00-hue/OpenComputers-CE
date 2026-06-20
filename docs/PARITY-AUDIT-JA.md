@@ -3,7 +3,7 @@
 **対象:** `dev-MC1.20` vs Etalon `OpenComputers-Original` (MC 1.12.2)  
 **方法:** モジュール単位のソース diff、Original との行単位比較  
 **日付:** 2026-06-20  
-**Fork PRs:** [#5 P0 fixes](https://github.com/ximaks00-hue/OpenComputers-CE/pull/5) · [#6 audit docs](https://github.com/ximaks00-hue/OpenComputers-CE/pull/6)
+**Fork PR:** https://github.com/ximaks00-hue/OpenComputers-CE/pull/5 （P0 修正バッチ）
 
 ---
 
